@@ -187,18 +187,6 @@ router.post('/admin/onboarding-link', adminOnly, (req: Request, res: Response) =
   res.json(link);
 });
 
-router.get('/settings', adminOnly, async (_req: Request, res: Response) => {
-  try {
-    let settings = await PortalSettings.findOne();
-    if (!settings) {
-      settings = await PortalSettings.create({});
-    }
-    res.json(settings);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch settings' });
-  }
-});
-
 router.patch('/settings/client-portal', adminOnly, async (req: Request, res: Response) => {
   try {
     const { enabled } = req.body;
@@ -223,6 +211,12 @@ router.patch('/settings/client-portal', adminOnly, async (req: Request, res: Res
         );
         await Session.deleteMany({ userId: { $in: clientIds } });
       }
+    } else {
+      // Re-enable client users when the portal is re-enabled
+      await User.updateMany(
+        { role: 'client', isActive: false },
+        { $set: { isActive: true } }
+      );
     }
 
     res.json(settings);

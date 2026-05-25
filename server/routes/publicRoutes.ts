@@ -29,4 +29,16 @@ router.post('/onboarding/consume/:token', (req: Request, res: Response) => {
   res.json({ message: 'Link consumed', clientName: link.clientName, email: link.email });
 });
 
+router.get('/settings', async (_req: Request, res: Response) => {
+  try {
+    let settings = await PortalSettings.findOne();
+    if (!settings) {
+      settings = await PortalSettings.create({});
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
 export default router;

@@ -308,7 +308,7 @@ export default function ClientConsole({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <div className="flex -space-x-2">
-                {focusProj.team.map((t, i) => (
+                {(focusProj.team || []).map((t, i) => (
                   <img
                     key={i}
                     alt={t.name}

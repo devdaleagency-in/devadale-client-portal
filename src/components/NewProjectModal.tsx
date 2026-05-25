@@ -12,20 +12,20 @@ interface NewProjectModalProps {
 
 export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalProps) {
   const [name, setName] = useState('');
-  const [stage, setStage] = useState<ProjectStage>('Conceptualizing');
+  const [stage, setStage] = useState<ProjectStage>('Discovery');
   const [health, setHealth] = useState<ProjectHealth>('healthy');
   const [nextMilestone, setNextMilestone] = useState('');
   const [nextMilestoneDate, setNextMilestoneDate] = useState('');
   const [iconName, setIconName] = useState('palette');
   const [description, setDescription] = useState('');
-  const [industry, setIndustry] = useState('Technology');
+  const [industry, setIndustry] = useState('UI/UX Design');
   const [otherIndustry, setOtherIndustry] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     if (industry === 'Others' && !otherIndustry.trim()) {
-      alert('Please specify your industry when selecting "Others"');
+      alert('Please specify your category/service when selecting "Others"');
       return;
     }
 
@@ -37,11 +37,12 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
       health,
       client: name,
       description,
-      progress: stage === 'Conceptualizing' ? 10 : stage === 'UI Design' ? 40 : stage === 'Prototype' ? 70 : 90,
+      progress: stage === 'Discovery' ? 15 : stage === 'UI/UX Design' ? 45 : stage === 'Development' ? 70 : stage === 'Testing & QA' ? 85 : 100,
       nextMilestone: nextMilestone || 'Milestone Discovery Call',
       nextMilestoneDate: nextMilestoneDate || 'Oct 23',
       lastUpdated: 'Just now',
       iconName,
+      category: finalIndustry,
       team: [
         { name: 'Sarah Chen', avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBTGfS3cEGwSdGHDpZygaZHGvsFDG9hJ_mxMdfuCR9-6-rHjngZY3OJTrZVbAe1naOlohIYGfK15ABf9PYuOClXXBjsA6Oir3ftkGivisjWfUXralh-xgdoaaybgiL3dvTZhkmNEze9bcCAZeVBfArYUPUZNplkkgrowcQFi3u-mMPOzCWyL7JoBCxT3eulu3aBJ1zk_H6Xa4Cu7zVJe4Zagkpr2h7BVhiIIiqr8U2iNAIHQ8KIvpKdsCCuyRWsyZ0EhhxoiGvgcqc' }
       ]
@@ -86,32 +87,29 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
             />
           </div>
 
-          {/* Industry */}
+          {/* Category / Service Type */}
           <div className="space-y-1">
-            <label htmlFor="new-project-industry" className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Industry</label>
+            <label htmlFor="new-project-industry" className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Project Category / Service Type</label>
             <select
               id="new-project-industry"
               value={industry}
               onChange={(e) => setIndustry(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
             >
-              <option value="Technology">Technology</option>
-              <option value="Healthcare">Healthcare</option>
-              <option value="Finance">Finance</option>
-              <option value="E-commerce">E-commerce</option>
-              <option value="Education">Education</option>
-              <option value="Real Estate">Real Estate</option>
-              <option value="Manufacturing">Manufacturing</option>
-              <option value="Media & Entertainment">Media & Entertainment</option>
+              <option value="Web Development">Web Development</option>
+              <option value="UI/UX Design">UI/UX Design</option>
+              <option value="Mobile App Development">Mobile App Development</option>
+              <option value="Branding & Identity">Branding & Identity</option>
+              <option value="Digital Marketing">Digital Marketing</option>
               <option value="Others">Others</option>
             </select>
           </div>
 
-          {/* Other Industry - conditional field */}
+          {/* Other Category - conditional field */}
           {industry === 'Others' && (
             <div className="space-y-1">
               <label htmlFor="new-project-other-industry" className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">
-                Specify Your Industry <span className="text-red-500">*</span>
+                Specify Your Category / Service <span className="text-red-500">*</span>
               </label>
               <input
                 id="new-project-other-industry"
@@ -120,7 +118,7 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
                 value={otherIndustry}
                 onChange={(e) => setOtherIndustry(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
-                placeholder="e.g. Agriculture, Transportation, etc."
+                placeholder="e.g. SEO Audit, Consulting, etc."
               />
             </div>
           )}
@@ -135,10 +133,11 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
                 onChange={(e) => setStage(e.target.value as ProjectStage)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
               >
-                <option value="Conceptualizing">Conceptualizing</option>
-                <option value="UI Design">UI Design</option>
-                <option value="Prototype">Prototype</option>
-                <option value="Golden Master">Golden Master</option>
+                <option value="Discovery">Discovery</option>
+                <option value="UI/UX Design">UI/UX Design</option>
+                <option value="Development">Development</option>
+                <option value="Testing & QA">Testing & QA</option>
+                <option value="Completed & Launched">Completed & Launched</option>
               </select>
             </div>
 
@@ -167,7 +166,7 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
               value={nextMilestone}
               onChange={(e) => setNextMilestone(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
-              placeholder="e.g. Design review v2, QA validation"
+              placeholder="e.g. Wireframe review, Sprint Planning v1"
             />
           </div>
 
@@ -194,8 +193,10 @@ export default function NewProjectModal({ onClose, onSubmit }: NewProjectModalPr
                 onChange={(e) => setIconName(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none"
               >
-                <option value="palette">Design Palette</option>
-                <option value="leaf">Eco & Green</option>
+                <option value="palette">Design & UI/UX (Palette)</option>
+                <option value="globe">Web Development (Globe)</option>
+                <option value="smartphone">Mobile App (Phone)</option>
+                <option value="rocket">Marketing & Launch (Rocket)</option>
                 <option value="cpu">Core Microchip</option>
                 <option value="shoppingcart">Cart / E-commerce</option>
               </select>

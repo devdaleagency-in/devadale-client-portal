@@ -126,7 +126,7 @@ export default function OtherTabViews({
                       }`} />
                   </div>
                   <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-3">{proj.name}</h3>
-                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-1">Lead Architect: {proj.team[0]?.name || 'Sarah Chen'}</p>
+                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-1">Lead Architect: {proj.team?.[0]?.name || 'Sarah Chen'}</p>
                 </div>
 
                 <div className="space-y-3.5">
