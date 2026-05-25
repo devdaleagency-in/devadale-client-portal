@@ -1,0 +1,6 @@
+{
+  "name": "DevDale Portal",
+  "description": "Enterprise Console and Client Dashboard for project analytics, timeline tracking, agreement signing, and onboarding.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
