@@ -12,6 +12,7 @@ import {
   extractJtiFromToken,
 } from '../tokens/tokenService';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService';
+import { createAuditLog } from '../services/audit.service';
 import { config } from '../utils/config';
 
 export interface AuthTokens {
@@ -119,13 +120,27 @@ export async function loginUser(
   const accessToken = signAccessToken(user._id.toString(), user.role, user.tokenVersion);
   const { token: refreshToken, jti: tokenId } = signRefreshToken(user._id.toString(), user.role, user.tokenVersion);
 
+  const familyId = crypto.randomUUID();
+
   await Session.create({
     userId: user._id.toString(),
+    familyId,
     tokenId,
     refreshToken: crypto.createHash('sha256').update(refreshToken).digest('hex'),
     userAgent,
     ip,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  await createAuditLog({
+    userId: user._id.toString(),
+    userRole: user.role,
+    action: 'login',
+    entity: 'User',
+    entityId: user._id.toString(),
+    description: 'User logged in',
+    ip,
+    userAgent,
   });
 
   return {
@@ -159,11 +174,27 @@ export async function refreshTokens(
     throw Object.assign(new Error('User not found or inactive'), { statusCode: 401 });
   }
 
-  const session = await Session.findOne({ tokenId: payload.jti, isRevoked: false });
-    if (!session) {
-    // Session not found. This could mean the token is reused!
-    // We should revoke all sessions for this user as a security measure.
-    await logoutAllSessions(payload.sub);
+  const session = await Session.findOne({ tokenId: payload.jti });
+  if (!session) {
+    throw Object.assign(new Error('Session not found'), { statusCode: 401 });
+  }
+
+  if (session.isRevoked) {
+    // Session is revoked. This could mean the token is reused!
+    // We should revoke the entire session family as a security measure.
+    await Session.updateMany({ familyId: session.familyId, isRevoked: false }, { isRevoked: true });
+    
+    await createAuditLog({
+      userId: user._id.toString(),
+      userRole: user.role,
+      action: 'token_reuse',
+      entity: 'Session',
+      entityId: session._id.toString(),
+      description: 'Detected token reuse. Revoked entire session family.',
+      ip,
+      userAgent,
+    });
+
     throw Object.assign(new Error('Session not found or token already used (reuse detected)'), { statusCode: 401 });
   }
 
@@ -176,6 +207,7 @@ export async function refreshTokens(
 
   await Session.create({
     userId: user._id.toString(),
+    familyId: session.familyId,
     tokenId: newTokenId,
     refreshToken: crypto.createHash('sha256').update(newRefreshToken).digest('hex'),
     userAgent,
@@ -249,6 +281,15 @@ export async function resetPassword(token: string, newPassword: string): Promise
   await user.save();
 
   await logoutAllSessions(user._id.toString());
+
+  await createAuditLog({
+    userId: user._id.toString(),
+    userRole: user.role,
+    action: 'password_reset',
+    entity: 'User',
+    entityId: user._id.toString(),
+    description: 'User reset their password using recovery link',
+  });
 }
 
 export async function verifyEmail(token: string): Promise<void> {

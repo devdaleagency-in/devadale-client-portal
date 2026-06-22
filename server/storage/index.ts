@@ -3,6 +3,8 @@ import path from 'path';
 import { Readable } from 'stream';
 import { config } from '../config';
 
+import jwt from 'jsonwebtoken';
+
 interface StorageProvider {
   upload(fileName: string, buffer: Buffer, mimeType: string): Promise<string>;
   download(fileName: string): Promise<Buffer>;
@@ -27,7 +29,7 @@ class LocalStorage implements StorageProvider {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(filePath, buffer);
-    return `/uploads/${fileName}`;
+    return fileName;
   }
 
   async download(fileName: string): Promise<Buffer> {
@@ -41,8 +43,13 @@ class LocalStorage implements StorageProvider {
     }
   }
 
-  async getSignedUrl(fileName: string, _expiresIn?: number): Promise<string> {
-    return `/uploads/${fileName}`;
+  async getSignedUrl(fileName: string, expiresIn = 3600): Promise<string> {
+    const token = jwt.sign({ type: 'file_download', fileKey: fileName }, config.jwt.accessSecret, {
+      expiresIn,
+      audience: config.jwt.audience,
+      issuer: config.jwt.issuer,
+    });
+    return `/api/files/download?token=${token}`;
   }
 }
 
@@ -80,12 +87,14 @@ export async function uploadFile(
   buffer: Buffer,
   originalName: string,
   mimeType: string,
-  prefix = 'uploads'
+  prefix = 'uploads',
+  clientId?: string
 ): Promise<{ url: string; key: string }> {
   const ext = path.extname(originalName);
-  const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-  const url = await storage.upload(key, buffer, mimeType);
-  return { url, key };
+  const basePrefix = clientId ? `${prefix}/${clientId}` : prefix;
+  const key = `${basePrefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const fileKey = await storage.upload(key, buffer, mimeType);
+  return { url: fileKey, key: fileKey };
 }
 
 export async function getSignedUrl(key: string, expiresIn = 3600): Promise<string> {

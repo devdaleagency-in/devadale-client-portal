@@ -12,6 +12,7 @@ import {
   changePasswordSchema,
 } from '../validators/authValidators';
 import * as authService from '../auth/authService';
+import { createAuditLog } from '../services/audit.service';
 import User from '../models/User';
 
 const router = Router();
@@ -165,6 +166,15 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     await user.save();
     
     await authService.logoutAllSessions(req.user!.userId);
+
+    await createAuditLog({
+      userId: user._id.toString(),
+      userRole: user.role,
+      action: 'password_reset',
+      entity: 'User',
+      entityId: user._id.toString(),
+      description: 'User changed their password',
+    });
 
     res.json({ message: 'Password changed successfully' });
   } catch (err: any) {

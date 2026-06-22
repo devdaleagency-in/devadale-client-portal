@@ -8,7 +8,8 @@ export interface TokenPayload {
   role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
   tokenVersion?: number;
   jti: string;
-  type: 'access' | 'refresh';
+  type: 'access' | 'refresh' | 'file_download';
+  fileKey?: string;
 }
 
 function generateJti(): string {

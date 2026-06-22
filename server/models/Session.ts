@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISession extends Document {
   userId: string;
+  familyId: string;
   tokenId: string;
   refreshToken: string;
   userAgent: string;
@@ -14,6 +15,7 @@ export interface ISession extends Document {
 const sessionSchema = new Schema<ISession>(
   {
     userId: { type: String, required: true, index: true },
+    familyId: { type: String, required: true, index: true },
     tokenId: { type: String, required: true, unique: true },
     refreshToken: { type: String, required: true },
     userAgent: { type: String, default: '' },

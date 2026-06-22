@@ -11,6 +11,7 @@ import conversationRoutes from './routes/conversationRoutes';
 import meetingRoutes from './routes/meetingRoutes';
 import revisionRoutes from './routes/revisionRoutes';
 import authRoutes from './auth/authRoutes';
+import filesRoutes from './routes/files.routes';
 import connectMongoDB from './mongodb';
 import { setupSocketIO } from './sockets';
 import { generalLimiter } from './middleware/rateLimiter';
@@ -112,8 +113,11 @@ app.use('/api/meetings', meetingRoutes);
 // Revision routes
 app.use('/api/revisions', revisionRoutes);
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// File downloads
+app.use('/api/files', filesRoutes);
+
+// Serve uploaded files (now handled via signed URLs in files.routes)
+// removed static express.static for security
 
 // Serve static frontend in production
 if (!isDev) {

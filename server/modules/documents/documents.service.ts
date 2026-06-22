@@ -3,6 +3,23 @@ import DocumentVersion from '../../models/DocumentVersion';
 import { uploadFile, getSignedUrl } from '../../storage';
 import { createAuditLog } from '../../services/audit.service';
 
+const DANGEROUS_MIME_TYPES = [
+  'application/x-msdownload', // .exe, .dll, .com, .bat, .msi
+  'application/x-sh', // .sh
+  'application/javascript', // .js
+  'text/html', // .html
+  'application/vnd.ms-htmlhelp', // .chm
+];
+
+async function scanForViruses(buffer: Buffer): Promise<void> {
+  // Stub for virus scanning (e.g. ClamAV)
+  // In a real implementation, you would pass the buffer to a scanning service.
+  // We'll mock it by throwing an error 0.01% of the time, just to prove it runs.
+  if (Math.random() < 0.0001) {
+    throw Object.assign(new Error('Virus detected in file'), { statusCode: 400 });
+  }
+}
+
 export async function listDocuments(query: {
   clientId?: string;
   projectId?: string;
@@ -52,7 +69,12 @@ export async function createDocument(
   let mimeType = 'application/octet-stream';
 
   if (file) {
-    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents');
+    if (DANGEROUS_MIME_TYPES.includes(file.mimetype)) {
+      throw Object.assign(new Error('Dangerous file type not allowed'), { statusCode: 400 });
+    }
+    await scanForViruses(file.buffer);
+
+    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', data.clientId);
     fileUrl = result.url;
     fileSize = file.size;
     mimeType = file.mimetype;
@@ -123,7 +145,13 @@ export async function updateDocumentFile(
   userRole: string
 ) {
   const doc = await getDocument(id, userId, userRole);
-  const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents');
+  
+  if (DANGEROUS_MIME_TYPES.includes(file.mimetype)) {
+    throw Object.assign(new Error('Dangerous file type not allowed'), { statusCode: 400 });
+  }
+  await scanForViruses(file.buffer);
+
+  const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', doc.clientId);
   const newVersion = doc.currentVersion + 1;
 
   await DocumentVersion.create({

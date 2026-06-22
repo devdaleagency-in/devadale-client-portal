@@ -3,7 +3,7 @@ import AuditLog from '../models/AuditLog';
 export async function createAuditLog(data: {
   userId: string;
   userRole?: string;
-  action: 'create' | 'update' | 'delete' | 'sign' | 'send' | 'view' | 'payment' | 'login' | 'logout' | 'other';
+  action: 'create' | 'update' | 'delete' | 'sign' | 'send' | 'view' | 'payment' | 'login' | 'logout' | 'password_reset' | 'token_reuse' | 'privilege_change' | 'other';
   entity: string;
   entityId: string;
   description: string;

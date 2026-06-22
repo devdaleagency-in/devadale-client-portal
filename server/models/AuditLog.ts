@@ -4,7 +4,7 @@ export interface IAuditLog {
   _id: string;
   userId: string;
   userRole: string;
-  action: 'create' | 'update' | 'delete' | 'sign' | 'send' | 'view' | 'payment' | 'login' | 'logout' | 'other';
+  action: 'create' | 'update' | 'delete' | 'sign' | 'send' | 'view' | 'payment' | 'login' | 'logout' | 'password_reset' | 'token_reuse' | 'privilege_change' | 'other';
   entity: string;
   entityId: string;
   description: string;
@@ -21,7 +21,7 @@ const auditLogSchema = new Schema<IAuditLog>(
     userRole: { type: String, default: '' },
     action: {
       type: String,
-      enum: ['create', 'update', 'delete', 'sign', 'send', 'view', 'payment', 'login', 'logout', 'other'],
+      enum: ['create', 'update', 'delete', 'sign', 'send', 'view', 'payment', 'login', 'logout', 'password_reset', 'token_reuse', 'privilege_change', 'other'],
       required: true,
     },
     entity: { type: String, required: true, index: true },

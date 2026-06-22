@@ -27,9 +27,13 @@ async function jwtAuthMiddleware(socket: AuthSocket, next: (err?: Error) => void
       return next(new Error('Token has been revoked'));
     }
 
-    const user = await User.findById(payload.sub).select('_id role name isActive');
+    const user = await User.findById(payload.sub).select('_id role name isActive tokenVersion');
     if (!user || !user.isActive) {
       return next(new Error('User not found or inactive'));
+    }
+
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      return next(new Error('Token has been invalidated due to password change'));
     }
 
     socket.userId = user._id.toString();
