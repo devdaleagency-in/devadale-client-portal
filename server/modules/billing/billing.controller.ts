@@ -57,7 +57,7 @@ export async function recordPayment(req: Request, res: Response) {
 
 export async function getInvoicePayments(req: Request, res: Response) {
   try {
-    const payments = await billingService.getInvoicePayments(req.params.id);
+    const payments = await billingService.getInvoicePayments(req.params.id, req.user?.userId, req.user?.role);
     res.json(payments);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

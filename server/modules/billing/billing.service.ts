@@ -177,7 +177,12 @@ export async function recordPayment(data: any, userId: string, userRole: string)
   return { payment, invoice };
 }
 
-export async function getInvoicePayments(invoiceId: string) {
+export async function getInvoicePayments(invoiceId: string, userId?: string, role?: string) {
+  const invoice = await Invoice.findById(invoiceId);
+  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (role !== 'admin' && role !== 'super_admin' && invoice.clientId !== userId) {
+    throw Object.assign(new Error('Access denied'), { statusCode: 403 });
+  }
   return Payment.find({ invoiceId, deletedAt: null }).sort({ createdAt: -1 });
 }
 

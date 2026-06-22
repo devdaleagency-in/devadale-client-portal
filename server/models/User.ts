@@ -21,6 +21,7 @@ export interface IUser {
   loginAttempts: number;
   lockUntil: Date | null;
   assignedProjects: string[];
+  tokenVersion: number;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -45,6 +46,7 @@ const userSchema = new Schema<IUser>(
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
     assignedProjects: [{ type: String, ref: 'Project' }],
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true, _id: false }
 );

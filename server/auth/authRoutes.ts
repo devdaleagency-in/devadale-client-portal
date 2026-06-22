@@ -30,7 +30,15 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     const result = await authService.loginUser(req.body.email, req.body.password, ip, userAgent);
-    res.json(result);
+    res.cookie('refreshToken', result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    // Remove refresh token from response body to prevent XSS theft
+    const safeResult = { ...result, tokens: { accessToken: result.tokens.accessToken } };
+    res.json(safeResult);
   } catch (err: any) {
     res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -40,8 +48,16 @@ router.post('/refresh', validate(refreshSchema), async (req: Request, res: Respo
   try {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    const tokens = await authService.refreshTokens(req.body.refreshToken, ip, userAgent);
-    res.json(tokens);
+    const token = req.cookies?.refreshToken || req.body.refreshToken;
+    if (!token) throw Object.assign(new Error('No refresh token provided'), { statusCode: 401 });
+    const tokens = await authService.refreshTokens(token, ip, userAgent);
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+    res.json({ accessToken: tokens.accessToken });
   } catch (err: any) {
     res.status(err.statusCode || 500).json({ error: err.message });
   }
@@ -49,10 +65,12 @@ router.post('/refresh', validate(refreshSchema), async (req: Request, res: Respo
 
 router.post('/logout', async (req: Request, res: Response) => {
   try {
-    const refreshToken = req.body.refreshToken || '';
+    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken || '';
     await authService.logoutUser(refreshToken);
+    res.clearCookie('refreshToken', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });
   } catch {
+    res.clearCookie('refreshToken', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
     res.json({ message: 'Logged out successfully' });
   }
 });

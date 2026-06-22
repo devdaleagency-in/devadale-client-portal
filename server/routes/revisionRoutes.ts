@@ -11,7 +11,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { userId, role } = req.user!;
-    const filter = role === 'admin' ? {} : { userId };
+    const filter = ['admin', 'super_admin', 'team_member'].includes(role) ? {} : { userId };
     const revisions = await Revision.find(filter).sort({ createdAt: -1 });
     res.json(revisions);
   } catch (err: any) {

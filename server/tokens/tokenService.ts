@@ -5,7 +5,8 @@ import TokenBlacklist from '../models/TokenBlacklist';
 
 export interface TokenPayload {
   sub: string;
-  role: 'admin' | 'client' | 'onboarding';
+  role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
+  tokenVersion?: number;
   jti: string;
   type: 'access' | 'refresh';
 }
@@ -14,12 +15,13 @@ function generateJti(): string {
   return crypto.randomBytes(24).toString('hex');
 }
 
-export function signAccessToken(userId: string, role: string): string {
+export function signAccessToken(userId: string, role: string, tokenVersion: number = 0): string {
   const payload: TokenPayload = {
     sub: userId,
     role: role as TokenPayload['role'],
     jti: generateJti(),
     type: 'access',
+    tokenVersion,
   };
   return jwt.sign(payload, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiresIn as any,
@@ -27,13 +29,14 @@ export function signAccessToken(userId: string, role: string): string {
   });
 }
 
-export function signRefreshToken(userId: string, role: string): { token: string; jti: string } {
+export function signRefreshToken(userId: string, role: string, tokenVersion: number = 0): { token: string; jti: string } {
   const jti = generateJti();
   const payload: TokenPayload = {
     sub: userId,
     role: role as TokenPayload['role'],
     jti,
     type: 'refresh',
+    tokenVersion,
   };
   const token = jwt.sign(payload, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshExpiresIn as any,

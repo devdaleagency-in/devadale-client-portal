@@ -2,6 +2,12 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_ACCESS_SECRET) throw new Error('JWT_ACCESS_SECRET is required in production');
+  if (!process.env.JWT_REFRESH_SECRET) throw new Error('JWT_REFRESH_SECRET is required in production');
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '5001', 10),
   mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/devdale',

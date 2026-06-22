@@ -10,7 +10,7 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { userId, role } = req.user!;
-    const filter = role === 'admin' ? {} : { userId };
+    const filter = ['admin', 'super_admin', 'team_member'].includes(role) ? {} : { userId };
     const meetings = await Meeting.find(filter).sort({ createdAt: -1 });
     res.json(meetings);
   } catch (err: any) {

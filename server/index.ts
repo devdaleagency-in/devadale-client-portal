@@ -47,7 +47,20 @@ const isDev = config.nodeEnv !== 'production';
 
 app.use(helmet({
   crossOriginResourcePolicy: isDev ? { policy: 'cross-origin' } : false,
-  contentSecurityPolicy: isDev ? false : undefined,
+  contentSecurityPolicy: isDev ? false : {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://*"],
+      connectSrc: ["'self'"],
+    },
+  },
+  xssFilter: true,
+  noSniff: true,
+  hidePoweredBy: true,
+  frameguard: { action: 'deny' },
 }));
 
 app.use(cors({

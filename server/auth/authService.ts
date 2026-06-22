@@ -29,40 +29,42 @@ export async function registerUser(data: {
   username: string;
   email: string;
   password: string;
-  role?: 'admin' | 'client';
-}): Promise<{ user: any }> {
-  const existing = await User.findOne({
-    $or: [
-      { email: data.email.toLowerCase() },
-      { username: data.username.toLowerCase() },
-    ],
-  });
-  if (existing) {
-    const field = existing.email === data.email.toLowerCase() ? 'Email' : 'Username';
-    throw Object.assign(new Error(`${field} already registered`), { statusCode: 409 });
-  }
-
-  const user = await User.create({
-    _id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: data.name,
-    username: data.username.toLowerCase(),
-    email: data.email.toLowerCase(),
-    password: data.password,
-    role: data.role || 'client',
-  });
-
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  user.emailVerificationToken = verificationToken;
-  user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await user.save();
-
+}): Promise<{ message: string }> {
   try {
-    await sendVerificationEmail(user.email, verificationToken);
-  } catch {
-    // queue email for retry
+    const existing = await User.findOne({
+      $or: [
+        { email: data.email.toLowerCase() },
+        { username: data.username.toLowerCase() },
+      ],
+    });
+    
+    if (!existing) {
+      const user = await User.create({
+        _id: crypto.randomUUID(),
+        name: data.name,
+        username: data.username.toLowerCase(),
+        email: data.email.toLowerCase(),
+        password: data.password,
+        role: 'client',
+      });
+
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      user.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+      user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await user.save();
+
+      try {
+        await sendVerificationEmail(user.email, verificationToken);
+      } catch {
+        // queue email for retry
+      }
+    }
+  } catch (err) {
+    console.error('Registration error', err);
   }
 
-  return { user: user.toJSON() };
+  // Always return success to prevent enumeration
+  return { message: 'Registration successful. Please check your email to verify your account.' };
 }
 
 export async function loginUser(
@@ -87,6 +89,7 @@ export async function loginUser(
   }
 
   if (!user.isActive) throw Object.assign(new Error('Account has been deactivated'), { statusCode: 403 });
+  if (!user.isEmailVerified) throw Object.assign(new Error('Please verify your email before logging in'), { statusCode: 403 });
 
   const isLocked = user.lockUntil && user.lockUntil > new Date();
   if (isLocked) {
@@ -113,13 +116,13 @@ export async function loginUser(
   user.lastLoginIp = ip;
   await user.save();
 
-  const accessToken = signAccessToken(user._id.toString(), user.role);
-  const { token: refreshToken, jti: tokenId } = signRefreshToken(user._id.toString(), user.role);
+  const accessToken = signAccessToken(user._id.toString(), user.role, user.tokenVersion);
+  const { token: refreshToken, jti: tokenId } = signRefreshToken(user._id.toString(), user.role, user.tokenVersion);
 
   await Session.create({
     userId: user._id.toString(),
     tokenId,
-    refreshToken,
+    refreshToken: crypto.createHash('sha256').update(refreshToken).digest('hex'),
     userAgent,
     ip,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -157,21 +160,24 @@ export async function refreshTokens(
   }
 
   const session = await Session.findOne({ tokenId: payload.jti, isRevoked: false });
-  if (!session) {
-    throw Object.assign(new Error('Session not found'), { statusCode: 401 });
+    if (!session) {
+    // Session not found. This could mean the token is reused!
+    // We should revoke all sessions for this user as a security measure.
+    await logoutAllSessions(payload.sub);
+    throw Object.assign(new Error('Session not found or token already used (reuse detected)'), { statusCode: 401 });
   }
 
   await blacklistToken(payload.jti, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
   await Session.findByIdAndUpdate(session._id, { isRevoked: true });
 
-  const accessToken = signAccessToken(user._id.toString(), user.role);
-  const { token: newRefreshToken, jti: newTokenId } = signRefreshToken(user._id.toString(), user.role);
+  const accessToken = signAccessToken(user._id.toString(), user.role, user.tokenVersion);
+  const { token: newRefreshToken, jti: newTokenId } = signRefreshToken(user._id.toString(), user.role, user.tokenVersion);
 
   await Session.create({
     userId: user._id.toString(),
     tokenId: newTokenId,
-    refreshToken: newRefreshToken,
+    refreshToken: crypto.createHash('sha256').update(newRefreshToken).digest('hex'),
     userAgent,
     ip,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -215,7 +221,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
   if (!user) return;
 
   const resetToken = crypto.randomBytes(32).toString('hex');
-  user.passwordResetToken = resetToken;
+  user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
   user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
@@ -228,7 +234,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
   const user = await User.findOne({
-    passwordResetToken: token,
+    passwordResetToken: crypto.createHash('sha256').update(token).digest('hex'),
     passwordResetExpires: { $gt: new Date() },
   });
 
@@ -239,6 +245,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
   user.passwordResetExpires = null;
   user.loginAttempts = 0;
   user.lockUntil = null;
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
 
   await logoutAllSessions(user._id.toString());
@@ -246,7 +253,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
 export async function verifyEmail(token: string): Promise<void> {
   const user = await User.findOne({
-    emailVerificationToken: token,
+    emailVerificationToken: crypto.createHash('sha256').update(token).digest('hex'),
     emailVerificationExpires: { $gt: new Date() },
   });
 

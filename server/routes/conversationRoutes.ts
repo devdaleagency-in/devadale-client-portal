@@ -55,8 +55,14 @@ router.post('/', async (req: Request, res: Response) => {
   const { userId, role } = req.user!;
   const { projectId, projectName, clientId, clientName } = req.body;
 
-  if (!projectId || !clientId) {
-    return res.status(400).json({ error: 'projectId and clientId are required' });
+  if (!projectId) {
+    return res.status(400).json({ error: 'projectId is required' });
+  }
+  
+  // Force clientId to be the requester if they are a client
+  const resolvedClientId = role === 'client' ? userId : clientId;
+  if (!resolvedClientId) {
+    return res.status(400).json({ error: 'clientId is required' });
   }
 
   try {
@@ -66,8 +72,8 @@ router.post('/', async (req: Request, res: Response) => {
     const conversation = await Conversation.create({
       projectId,
       projectName: projectName || 'Untitled Project',
-      clientId,
-      clientName: clientName || (await getDisplayName(clientId)),
+      clientId: resolvedClientId,
+      clientName: clientName || (await getDisplayName(resolvedClientId)),
       adminIds: role === 'admin' ? [userId] : ['user-1'],
     });
 
