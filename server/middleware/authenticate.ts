@@ -71,8 +71,11 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
     const payload = verifyAccessToken(token);
     const user = await User.findById(payload.sub).select('tokenVersion');
     req.user = { userId: payload.sub, role: payload.role, tokenVersion: user?.tokenVersion };
-  } catch {
-    // ignore invalid tokens for optional auth
+    next();
+  } catch (err: any) {
+    if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
+      return next();
+    }
+    next(err);
   }
-  next();
 }

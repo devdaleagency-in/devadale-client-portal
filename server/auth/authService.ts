@@ -246,7 +246,6 @@ export async function resetPassword(token: string, newPassword: string): Promise
   user.passwordResetExpires = null;
   user.loginAttempts = 0;
   user.lockUntil = null;
-  user.tokenVersion = (user.tokenVersion || 0) + 1;
   await user.save();
 
   await logoutAllSessions(user._id.toString());
