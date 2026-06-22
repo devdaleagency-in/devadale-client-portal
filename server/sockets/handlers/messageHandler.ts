@@ -15,9 +15,9 @@ async function getDisplayName(userId: string): Promise<string> {
 }
 
 export function registerMessageHandler(io: Server, socket: AuthSocket) {
-  socket.on('sendMessage', async (data: { conversationId: string; projectId: string; content: string; tempId?: string }, callback?: (response: any) => void) => {
+  socket.on('sendMessage', async (data: { conversationId: string; projectId: string; content: string; tempId?: string; attachments?: any[] }, callback?: (response: any) => void) => {
     if (!socket.userId || !socket.userRole) return;
-    if (!data.content || data.content.length > 5000) return;
+    if ((!data.content || data.content.length > 5000) && (!data.attachments || data.attachments.length === 0)) return;
     if (!data.conversationId || !data.projectId) return;
 
     try {
@@ -43,7 +43,8 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
         senderRole: socket.userRole as 'admin' | 'super_admin' | 'client' | 'team_member',
         conversationId: data.conversationId,
         projectId: data.projectId,
-        content: data.content,
+        content: data.content || '',
+        attachments: data.attachments || [],
         deliveryStatus: 'sent',
       }));
 
@@ -93,8 +94,11 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
         conversationId: message.conversationId,
         projectId: message.projectId,
         content: message.content,
+        attachments: message.attachments,
         isRead: message.isRead,
         deliveryStatus: message.deliveryStatus,
+        deliveredAt: message.deliveredAt,
+        readAt: message.readAt,
         createdAt: message.createdAt,
         updatedAt: message.updatedAt,
       };
@@ -138,7 +142,7 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
     try {
       await Message.updateMany(
         { _id: { $in: data.messageIds }, conversationId: data.conversationId, deliveryStatus: 'sent' },
-        { deliveryStatus: 'delivered' }
+        { deliveryStatus: 'delivered', deliveredAt: new Date() }
       );
       // Notify the sender that their messages were delivered
       io.to(data.senderId).emit('messagesDelivered', {
@@ -156,7 +160,7 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
     try {
       await Message.updateMany(
         { _id: { $in: data.messageIds }, conversationId: data.conversationId, isRead: false },
-        { isRead: true, deliveryStatus: 'read' },
+        { isRead: true, deliveryStatus: 'read', readAt: new Date() },
       );
 
       const conversation = await Conversation.findById(data.conversationId);
@@ -167,7 +171,7 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
       }
 
       const room = `conversation_${data.conversationId}`;
-      io.to(room).emit('messagesRead', { conversationId: data.conversationId, userId: socket.userId });
+      io.to(room).emit('messagesRead', { conversationId: data.conversationId, userId: socket.userId, messageIds: data.messageIds });
 
       // Find the sender(s) of these messages to notify their global room
       const messages = await Message.find({ _id: { $in: data.messageIds } }).select('senderId');

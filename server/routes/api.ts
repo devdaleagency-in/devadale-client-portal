@@ -8,6 +8,8 @@ import PortalSettings from '../models/PortalSettings';
 import Session from '../models/Session';
 import Summary from '../models/Summary';
 import Message from '../models/Message';
+import Integration from '../models/Integration';
+import Subscription from '../models/Subscription';
 import { authenticate } from '../middleware/authenticate';
 import { authorize, adminOnly, adminOrTeamMember } from '../middleware/authorize';
 import Document from '../models/Document';
@@ -182,7 +184,57 @@ router.get('/metrics', async (req: Request, res: Response) => {
     if (role === 'client' || role === 'team_member') return res.json({ activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 });
     const activeProjects = await Project.countDocuments();
     const pendingApprovals = await Document.countDocuments({ status: 'draft', type: 'msa' });
-    res.json({ activeProjects, pendingApprovals, teamProductivity: 92, monthlyRevenue: 142 });
+    
+    // Calculate real team productivity from projects (percentage of completed milestones)
+    const projects = await Project.find({});
+    let totalMilestones = 0;
+    let completedMilestones = 0;
+    projects.forEach(p => {
+      if ((p as any).milestones && Array.isArray((p as any).milestones)) {
+        totalMilestones += (p as any).milestones.length;
+        completedMilestones += (p as any).milestones.filter((m: any) => m.status === 'completed').length;
+      }
+    });
+    const teamProductivity = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+    
+    // For now, without a dedicated Invoice model with price data, we default to 0.
+    // If the system introduces an Invoice model, we would aggregate paid invoices here.
+    const monthlyRevenue = 0;
+
+    // Historical trends calculation
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const activeProjectsNow = await Project.countDocuments({ createdAt: { $gte: thirtyDaysAgo } });
+    const activeProjectsPrev = await Project.countDocuments({ createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } });
+
+    const pendingApprovalsNow = await Document.countDocuments({ status: 'draft', type: 'msa', createdAt: { $gte: thirtyDaysAgo } });
+    const pendingApprovalsPrev = await Document.countDocuments({ status: 'draft', type: 'msa', createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } });
+
+    const calculateTrend = (current: number, prev: number) => {
+      if (prev === 0 && current === 0) return null;
+      if (prev === 0) return { value: '+100%', direction: 'up' };
+      const diff = ((current - prev) / prev) * 100;
+      return {
+        value: `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`,
+        direction: diff >= 0 ? 'up' : 'down'
+      };
+    };
+
+    res.json({ 
+      activeProjects, 
+      pendingApprovals, 
+      teamProductivity, 
+      monthlyRevenue,
+      trends: {
+        activeProjects: calculateTrend(activeProjectsNow, activeProjectsPrev),
+        pendingApprovals: calculateTrend(pendingApprovalsNow, pendingApprovalsPrev),
+        teamProductivity: { value: 'Target: 95%', direction: 'up' }, // Keeping target static as it's a KPI goal
+        monthlyRevenue: calculateTrend(0, 0)
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch metrics' });
   }
@@ -249,7 +301,7 @@ router.post('/summarize', adminOrTeamMember, async (_req: Request, res: Response
     const summary = await generateProjectSummary(JSON.stringify(projects, null, 2));
     res.json({ summary });
   } catch {
-    res.json({ summary: '• Project V1 Prototype is on track for Oct 27 delivery\n• UI token system finalization in progress\n• Team productivity at 92% across active milestones\n• One pending agreement requires signature' });
+    res.json({ summary: 'Summary generation failed or no data available.' });
   }
 });
 
@@ -799,6 +851,34 @@ router.post('/summaries/:id/send-email', adminOrTeamMember, async (req: Request,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+router.get('/integrations', async (req: Request, res: Response) => {
+  try {
+    const integrations = await Integration.find();
+    res.json(integrations);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch integrations' });
+  }
+});
+
+router.put('/integrations/:id', async (req: Request, res: Response) => {
+  try {
+    const { status } = req.body;
+    const integration = await Integration.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json(integration);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update integration' });
+  }
+});
+
+router.get('/subscription', async (req: Request, res: Response) => {
+  try {
+    const subscription = await Subscription.findOne({ workspaceId: 'default' });
+    res.json(subscription);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch subscription' });
   }
 });
 

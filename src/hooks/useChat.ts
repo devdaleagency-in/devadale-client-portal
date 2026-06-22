@@ -18,6 +18,8 @@ interface ChatState {
   loading: boolean;
   sending: boolean;
   hasMore: boolean;
+  searchQuery: string;
+  onlineUsers: Record<string, { isOnline: boolean; lastSeen: Date | null }>;
 }
 
 export function useChat({ conversationId, currentUserId, currentUserRole }: UseChatOptions) {
@@ -29,6 +31,8 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
     loading: false,
     sending: false,
     hasMore: true,
+    searchQuery: '',
+    onlineUsers: {},
   });
   const [page, setPage] = useState(1);
   const listenersAttached = useRef(false);
@@ -75,8 +79,8 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
   }, [conversationId, state.hasMore, state.loading, page, fetchMessages]);
 
   // Send message
-  const sendMessage = useCallback(async (content: string) => {
-    if (!conversationId || !content.trim()) return;
+  const sendMessage = useCallback(async (content: string, files?: File[]) => {
+    if (!conversationId || (!content.trim() && (!files || files.length === 0))) return;
 
     const socket = getSocket();
     const tempId = `temp-${Date.now()}`;
@@ -93,17 +97,43 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
         senderRole: currentUserRole,
         isRead: false,
         deliveryStatus: 'sending',
+        attachments: files?.map(f => ({ url: '', name: f.name, type: f.type, size: f.size })),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }],
       sending: true,
     });
 
+    let uploadedAttachments: any[] = [];
+    if (files && files.length > 0) {
+      try {
+        const formData = new FormData();
+        files.forEach(f => formData.append('attachments', f));
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/conversations/${conversationId}/messages/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          uploadedAttachments = data.attachments;
+        }
+      } catch (err) {
+        console.error('Failed to upload attachments', err);
+        update({ sending: false });
+        return;
+      }
+    }
+
     if (socket?.connected) {
       socket.emit('sendMessage', { 
         conversationId, 
         projectId: state.activeConversation?.projectId?._id, 
         content: newMsgContent, 
+        attachments: uploadedAttachments,
         tempId 
       }, (res: any) => {
         if (res.success && res.message) {
@@ -117,12 +147,6 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
         }
       });
     } else {
-      try {
-        await api.sendMessage(newMsgContent);
-        await fetchMessages(conversationId, 1);
-      } catch {
-        // fallback
-      }
       update({ sending: false });
     }
   }, [conversationId, state.activeConversation, state.messages, currentUserId, currentUserRole, update, fetchMessages]);
@@ -160,14 +184,14 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
       if (msg.conversationId === conversationId && msg.senderId._id !== currentUserId) {
         markAsRead([msg._id]);
       }
-      fetchConversations();
+      // fetchConversations is heavy. We handle sorting via handleConversationUpdated
     };
 
     const handleMessagesRead = (data: { conversationId: string; userId: string; messageIds?: string[] }) => {
       setState(prev => ({
         ...prev,
         messages: prev.messages.map(m =>
-          m.conversationId === data.conversationId && m.senderId._id !== currentUserId && (!data.messageIds || data.messageIds.includes(m._id))
+          m.conversationId === data.conversationId && m.senderId._id !== data.userId && (!data.messageIds || data.messageIds.includes(m._id))
             ? { ...m, isRead: true, deliveryStatus: 'read' as const }
             : m
         ),
@@ -200,8 +224,32 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
       }));
     };
 
-    const handleConversationUpdated = () => {
-      fetchConversations();
+    const handleConversationUpdated = (data: any) => {
+      setState(prev => {
+        const updatedConvs = prev.conversations.map(c => {
+          if (c._id === data.conversationId) {
+            return { 
+              ...c, 
+              lastMessage: data.lastMessage, 
+              updatedAt: new Date().toISOString() 
+            };
+          }
+          return c;
+        });
+        // Sort dynamically: latest updatedAt first
+        updatedConvs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        return { ...prev, conversations: updatedConvs };
+      });
+    };
+
+    const handleUserStatusUpdate = (data: { userId: string; isOnline: boolean; lastSeen: Date | null }) => {
+      setState(prev => ({
+        ...prev,
+        onlineUsers: {
+          ...prev.onlineUsers,
+          [data.userId]: { isOnline: data.isOnline, lastSeen: data.lastSeen },
+        },
+      }));
     };
 
     socket.on('receiveMessage', handleReceiveMessage);
@@ -210,6 +258,7 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
     socket.on('userTyping', handleUserTyping);
     socket.on('userStopTyping', handleUserStopTyping);
     socket.on('conversationUpdated', handleConversationUpdated);
+    socket.on('userStatusUpdate', handleUserStatusUpdate);
 
     return () => {
       socket.off('receiveMessage', handleReceiveMessage);
@@ -218,6 +267,7 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
       socket.off('userTyping', handleUserTyping);
       socket.off('userStopTyping', handleUserStopTyping);
       socket.off('conversationUpdated', handleConversationUpdated);
+      socket.off('userStatusUpdate', handleUserStatusUpdate);
       listenersAttached.current = false;
     };
   }, [conversationId, currentUserId, markAsRead, fetchConversations]);
@@ -264,6 +314,7 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
 
   return {
     ...state,
+    setSearchQuery: (q: string) => update({ searchQuery: q }),
     sendMessage,
     loadMore,
     emitTyping,

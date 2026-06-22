@@ -4,6 +4,7 @@ import { authMiddleware, type AuthSocket } from './authMiddleware';
 import { registerMessageHandler } from './handlers/messageHandler';
 import { registerRoomHandler } from './handlers/roomHandler';
 import { registerTypingHandler } from './handlers/typingHandler';
+import { registerPresenceHandler } from './handlers/presenceHandler';
 
 let io: Server | null = null;
 
@@ -30,6 +31,7 @@ export function setupSocketIO(server: HttpServer) {
     registerRoomHandler(socket);
     registerMessageHandler(io!, socket);
     registerTypingHandler(io!, socket);
+    registerPresenceHandler(io!, socket);
 
     socket.on('disconnect', () => {
       // cleanup handled in individual handlers

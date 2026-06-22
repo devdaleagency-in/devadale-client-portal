@@ -28,53 +28,66 @@ interface ClientDeliverablesProps {
   onTriggerAction: (msg: string) => void;
 }
 
-const deliverables = [
-  { name: 'Brand Guidelines.pdf', type: 'PDF', size: '2.4 MB', tag: 'brand', icon: Palette, progress: 100, version: 'v3', status: 'approved' as const, date: 'Updated yesterday' },
-  { name: 'Desktop Wireframes', type: 'Link', size: 'Figma Prototype', tag: 'review', icon: ExternalLink, progress: 82, version: 'v4', status: 'review' as const, date: 'Updated today' },
-  { name: 'Assets_Package.zip', type: 'ZIP', size: '45 MB', tag: 'handoff', icon: Layers, progress: 100, version: 'v2', status: 'approved' as const, date: '3 days ago' },
-  { name: 'Homepage_Demo.mp4', type: 'Video', size: '48 MB', tag: 'review', icon: Video, progress: 82, version: 'v4', status: 'review' as const, date: 'Updated today' },
-];
+import { api } from '../utils/api';
 
-const roadmapMilestones = [
-  { id: 'm1', label: 'Discovery & Research', date: 'Sept 15', status: 'completed' as const },
-  { id: 'm2', label: 'Concept Development', date: 'Oct 02', status: 'completed' as const },
-  { id: 'm3', label: 'UI/UX Design', date: 'In Progress', status: 'active' as const },
-  { id: 'm4', label: 'Prototype', date: 'Oct 27', status: 'planned' as const },
-  { id: 'm5', label: 'Development', date: 'Nov 05', status: 'planned' as const },
-  { id: 'm6', label: 'Testing & QA', date: 'Nov 12', status: 'planned' as const },
-];
+interface FileDoc {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  tag: string;
+  path?: string;
+  uploadedAt: string;
+}
 
 export default function ClientDeliverables({ onTriggerAction }: ClientDeliverablesProps) {
   const [fileSearch, setFileSearch] = useState('');
   const [selectedFileTag, setSelectedFileTag] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<typeof deliverables[0] | null>(null);
+  const [previewFile, setPreviewFile] = useState<any | null>(null);
   const [isWorkApproved, setIsWorkApproved] = useState(false);
   const [isRevisionRequested, setIsRevisionRequested] = useState(false);
   const [isTestimonialSubmitted, setIsTestimonialSubmitted] = useState(false);
-  const [testimonialText, setTestimonialText] = useState('The portal gave us exactly the transparency and polish we wanted.');
+  const [testimonialText, setTestimonialText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFigmaPreview, setShowFigmaPreview] = useState(false);
 
+  const [files, setFiles] = useState<FileDoc[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        const fetchedFiles = await api.getFiles();
+        setFiles(fetchedFiles);
+      } catch (err) {
+        console.error('Failed to fetch files', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFiles();
+  }, []);
+
+  const roadmapMilestones: any[] = []; // In a real app this would come from API
+
   const fileQuery = fileSearch.trim().toLowerCase();
-  const filteredFiles = deliverables.filter((f) => {
-    if (fileQuery && !f.name.toLowerCase().includes(fileQuery) && !f.type.toLowerCase().includes(fileQuery) && !f.tag.toLowerCase().includes(fileQuery)) {
+  const filteredFiles = files.filter((f) => {
+    if (fileQuery && !f.name.toLowerCase().includes(fileQuery) && !f.type.toLowerCase().includes(fileQuery) && !(f.tag || '').toLowerCase().includes(fileQuery)) {
       return false;
     }
-    if (selectedFileTag && f.tag !== selectedFileTag.toLowerCase()) {
+    if (selectedFileTag && (f.tag || '').toLowerCase() !== selectedFileTag.toLowerCase()) {
       return false;
     }
     return true;
   });
 
-  const handleDownload = (file: typeof deliverables[0]) => {
-    const blob = new Blob([`Simulated download: ${file.name}`], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name.replace(/\.[^.]+$/, '.txt');
-    a.click();
-    URL.revokeObjectURL(url);
-    onTriggerAction(`${file.name} download started.`);
+  const handleDownload = (file: any) => {
+    if (file.path) {
+      window.open(file.path, '_blank');
+      onTriggerAction(`${file.name} downloaded.`);
+    } else {
+      onTriggerAction(`Download failed for ${file.name}`);
+    }
   };
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -118,11 +131,10 @@ export default function ClientDeliverables({ onTriggerAction }: ClientDeliverabl
 
       {/* Deliverables Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {deliverables.map((file) => {
-          const Icon = file.icon;
+        {files.slice(0, 3).map((file) => {
           return (
             <div
-              key={file.name}
+              key={file.id}
               onClick={() => {
                 if (file.type === 'Link') {
                   setShowFigmaPreview(true);
@@ -134,11 +146,11 @@ export default function ClientDeliverables({ onTriggerAction }: ClientDeliverabl
             >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-slate-800 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
-                  <Icon className="w-5 h-5" />
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{file.name}</h4>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{file.size} • {file.date}</p>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{file.size} • {new Date(file.uploadedAt).toLocaleDateString()}</p>
                 </div>
               </div>
               {file.type === 'Link' ? <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-emerald-500 transition-colors" /> : <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />}
@@ -211,10 +223,9 @@ export default function ClientDeliverables({ onTriggerAction }: ClientDeliverabl
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{file.name}</h4>
-                        <span className="text-[9px] uppercase font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{file.tag}</span>
+                        <span className="text-[9px] uppercase font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{file.tag || 'general'}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{file.type} • {file.size} • {file.version}</p>
-                      <ProgressMeter value={file.progress} label={`${file.name} progress`} variant="emerald" className="mt-2 progress-meter--tall" />
+                      <p className="text-[10px] text-slate-400 mt-0.5">{file.type} • {file.size}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => setPreviewFile(file)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -353,8 +364,8 @@ export default function ClientDeliverables({ onTriggerAction }: ClientDeliverabl
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
           <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-4">Recent Deliverables</h3>
           <div className="space-y-3">
-            {deliverables.slice(0, 3).map((file) => (
-              <div key={file.name} className="flex items-center justify-between">
+            {files.slice(0, 3).map((file) => (
+              <div key={file.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-blue-600">
                     <FileText className="w-4 h-4" />

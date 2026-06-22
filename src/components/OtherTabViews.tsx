@@ -92,8 +92,19 @@ export default function OtherTabViews({
 }: OtherTabViewsProps) {
   const [signerName, setSignerName] = useState('Admin User');
   const [signerTitle, setSignerTitle] = useState('Director');
-  const pipelineStages: [string, number, string, string][] = [];
-  const taskColumns: { title: string; tone: string; tasks: string[] }[] = [];
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentTab === 'integrations') {
+      api.getIntegrations().then(setIntegrations).catch(console.error);
+    } else if (currentTab === 'billing') {
+      api.getSubscription().then(setSubscription).catch(console.error);
+    }
+  }, [currentTab]);
+  
+  const allMilestones = projects.flatMap(p => p.milestones || []).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
 
   if (currentTab === 'timeline') {
     return (
@@ -104,46 +115,7 @@ export default function OtherTabViews({
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 overflow-x-auto">
-          {pipelineStages.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-xs text-slate-400">
-              Pipeline stages will appear here once your project roadmap is defined.
-            </div>
-          ) : (
-            <div className="min-w-[860px] grid grid-cols-10 gap-2">
-              {pipelineStages.map(([label, progress, status, date], index) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => onTriggerAction(`${label} stage selected. ${progress}% complete, target ${date}.`)}
-                className={`relative rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 ${status === 'completed'
-                    ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10'
-                    : status === 'active'
-                      ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500/10'
-                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30'
-                  }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${status === 'completed' ? 'bg-emerald-500 text-white' : status === 'active' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
-                    }`}>
-                    {index + 1}
-                  </span>
-                  {label === 'Development' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
-                </div>
-                <p className="text-[11px] font-black text-slate-800 dark:text-slate-100 mt-3 leading-tight">{label}</p>
-                <p className="text-[9px] font-bold text-slate-400 mt-1">{date}</p>
-                <ProgressMeter
-                  value={Number(progress)}
-                  label={`${label} stage progress`}
-                  className="mt-3 progress-meter--tall"
-                />
-              </button>
-            ))}
-          </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pipelineStages.length === 0 ? (
+          {allMilestones.length === 0 ? (
             <div className="md:col-span-2 lg:col-span-3">
               <EmptyState
                 icon={Calendar}
@@ -152,19 +124,42 @@ export default function OtherTabViews({
               />
             </div>
           ) : (
-            [
-              ['Upcoming milestone', 'V1 prototype review', 'Oct 27', 'blue'],
-              ['Estimated delivery', 'Production handoff', 'Nov 20', 'emerald'],
-              ['Delay watch', 'API copy review pending', '2 day risk', 'amber'],
-            ].map(([title, value, meta, tone]) => (
-              <div key={title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{title}</p>
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-2">{value}</h3>
-                <span className={`inline-flex mt-3 text-[10px] font-black rounded-full px-2 py-1 ${tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : tone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
-                  }`}>{meta}</span>
-              </div>
-            ))
+            <div className="min-w-[860px] grid grid-cols-5 gap-2">
+              {allMilestones.map((m, index) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onTriggerAction(`${m.label} stage selected.`)}
+                className={`relative rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 ${m.status === 'completed'
+                    ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/10'
+                    : m.status === 'active'
+                      ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500/10'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30'
+                  }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${m.status === 'completed' ? 'bg-emerald-500 text-white' : m.status === 'active' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+                    }`}>
+                    {index + 1}
+                  </span>
+                </div>
+                <p className="text-[11px] font-black text-slate-800 dark:text-slate-100 mt-3 leading-tight">{m.label}</p>
+                <p className="text-[9px] font-bold text-slate-400 mt-1">{m.date}</p>
+              </button>
+            ))}
+          </div>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {allMilestones.slice(0, 3).map((m) => (
+            <div key={m.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{m.status}</p>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-2">{m.label}</h3>
+              <span className={`inline-flex mt-3 text-[10px] font-black rounded-full px-2 py-1 ${m.tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : m.tone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
+                }`}>{new Date(m.date).toLocaleDateString()}</span>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -541,12 +536,12 @@ export default function OtherTabViews({
           {[
             { label: 'Monthly Revenue', value: `$${metrics.monthlyRevenue?.toLocaleString() || '0'}`, desc: 'Current month' },
             { label: 'Active Invoices', value: '4', desc: 'Pending payment' },
-            { label: 'Plan', value: 'Pro', desc: 'Agency tier' },
+            { label: 'Current Plan', value: subscription ? subscription.planName : '-', desc: subscription ? subscription.status : 'No data' },
           ].map((stat) => (
-            <div key={stat.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
-              <p className="text-2xl font-black text-slate-800 dark:text-slate-100">{stat.value}</p>
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">{stat.label}</p>
-              <p className="text-[10px] text-slate-500">{stat.desc}</p>
+            <div key={stat.label} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+              <p className="text-xs font-bold text-slate-500">{stat.label}</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-2">{stat.value}</p>
+              <p className="text-[10px] text-slate-400 mt-1">{stat.desc}</p>
             </div>
           ))}
         </div>
@@ -569,24 +564,27 @@ export default function OtherTabViews({
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Connect external tools and services to your agency workspace.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { name: 'Slack', desc: 'Send notifications to Slack channels', connected: true },
-            { name: 'GitHub', desc: 'Sync project milestones with repos', connected: true },
-            { name: 'Jira', desc: 'Bi-directional task sync', connected: false },
-            { name: 'HubSpot', desc: 'CRM integration for client management', connected: false },
-            { name: 'Stripe', desc: 'Payment processing & invoicing', connected: true },
-            { name: 'Google Drive', desc: 'Cloud file storage & sharing', connected: false },
-          ].map((integration) => (
-            <div key={integration.name} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{integration.name}</h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${integration.connected ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
-                  {integration.connected ? 'Connected' : 'Disconnected'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">{integration.desc}</p>
+          {integrations.length === 0 ? (
+            <div className="md:col-span-2 lg:col-span-3">
+              <EmptyState
+                icon={Plus}
+                title="No integrations available"
+                description="Your workspace currently has no active integrations configured."
+              />
             </div>
-          ))}
+          ) : (
+            integrations.map((integration) => (
+              <div key={integration.name} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{integration.name}</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${integration.status !== 'Needs auth' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
+                    {integration.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">{integration.description}</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );

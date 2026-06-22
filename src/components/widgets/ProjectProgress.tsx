@@ -39,14 +39,7 @@ function Skeleton() {
   );
 }
 
-const defaultMilestones = [
-  { label: 'Discovery & Research', completed: true },
-  { label: 'Concept Development', completed: true },
-  { label: 'UI/UX Design', completed: false },
-  { label: 'Prototype & Testing', completed: false },
-  { label: 'Development', completed: false },
-  { label: 'Launch & Handoff', completed: false },
-];
+const defaultMilestones: any[] = [];
 
 export default function ProjectProgress({ project, loading, milestones }: ProjectProgressProps) {
   if (loading) {
@@ -145,6 +138,9 @@ export default function ProjectProgress({ project, loading, milestones }: Projec
             {m.completed && <ArrowRight className="w-2.5 h-2.5 text-slate-300 ml-auto" />}
           </div>
         ))}
+        {ms.length === 0 && (
+          <p className="text-[10px] text-slate-400 text-center italic">No milestones defined yet.</p>
+        )}
       </div>
     </div>
   );

@@ -33,13 +33,7 @@ interface SidebarProps {
   onNewProjectClick: () => void;
 }
 
-const teamMembers = [
-  { initials: 'JD', gradient: 'from-blue-400 to-blue-600' },
-  { initials: 'SC', gradient: 'from-emerald-400 to-emerald-600' },
-  { initials: 'AK', gradient: 'from-purple-400 to-purple-600' },
-  { initials: 'MR', gradient: 'from-rose-400 to-rose-600' },
-  { initials: 'TW', gradient: 'from-amber-400 to-amber-600' },
-];
+const teamMembers: any[] = [];
 
 export default function Sidebar({
   currentTab,
@@ -120,21 +114,10 @@ export default function Sidebar({
               <Users className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Online</span>
             </div>
-            <span className="text-[10px] text-slate-400">{teamMembers.length} members</span>
+            <span className="text-[10px] text-slate-400">0 members</span>
           </div>
           <div className="flex items-center mt-2">
             <div className="flex -space-x-1.5">
-              {teamMembers.slice(0, 3).map((member, i) => (
-                <div
-                  key={member.initials}
-                  className={`relative w-6 h-6 rounded-full bg-gradient-to-br ${member.gradient} border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-white`}
-                >
-                  {member.initials}
-                </div>
-              ))}
-              <div className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-slate-400">
-                +{teamMembers.length - 3}
-              </div>
             </div>
           </div>
         </div>
@@ -142,9 +125,9 @@ export default function Sidebar({
         {/* 4. Mini Analytics Widget */}
         <div className="grid grid-cols-3 gap-1.5">
           {[
-            { value: '12', label: 'Projects', color: 'text-blue-400' },
-            { value: '48', label: 'Completed', color: 'text-emerald-400' },
-            { value: '$8.2k', label: 'Revenue', color: 'text-amber-400' },
+            { value: '-', label: 'Projects', color: 'text-blue-400' },
+            { value: '-', label: 'Completed', color: 'text-emerald-400' },
+            { value: '-', label: 'Revenue', color: 'text-amber-400' },
           ].map((stat) => (
             <div key={stat.label} className="group bg-slate-800/40 hover:bg-slate-800/60 rounded-lg p-2 text-center transition-colors">
               <div className={`text-xs font-bold ${stat.color} group-hover:scale-110 transition-transform`}>{stat.value}</div>

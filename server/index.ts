@@ -106,6 +106,8 @@ app.use('/api', authenticate, clientPortalGuard, apiRouter);
 
 // Conversation routes
 app.use('/api/conversations', conversationRoutes);
+import messageUploadRoutes from './routes/messageUploadRoutes';
+app.use('/api/conversations', messageUploadRoutes);
 
 // Meeting routes
 app.use('/api/meetings', meetingRoutes);

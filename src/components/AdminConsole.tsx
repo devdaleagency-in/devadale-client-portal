@@ -118,32 +118,7 @@ export default function AdminConsole({
   const newCount = projects.length - 4 > 0 ? projects.length - 4 : 2;
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
-  const chartData = {
-    month: {
-      path: 'M0,165 Q45,145 90,110 T180,75 T270,95 T360,20',
-      fill: 'M0,165 Q45,145 90,110 T180,75 T270,95 T360,20 L360,200 L0,200 Z',
-      labelValues: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-      points: [
-        { cx: 0, cy: 165, val: 'Week 1: Low Touchpoints' },
-        { cx: 90, cy: 110, val: 'Week 2: Medium System' },
-        { cx: 180, cy: 75, val: 'Week 3: Peak Draft design' },
-        { cx: 360, cy: 20, val: 'Week 4: Release Launch' },
-      ],
-    },
-    quarter: {
-      path: 'M0,140 Q45,60 90,120 T180,45 T270,140 T360,95',
-      fill: 'M0,140 Q45,60 90,120 T180,45 T270,140 T360,95 L360,200 L0,200 Z',
-      labelValues: ['Month 1', 'Month 2', 'Month 3', 'Average'],
-      points: [
-        { cx: 0, cy: 140, val: 'Month 1: Kickoff' },
-        { cx: 90, cy: 120, val: 'Month 2: UI Design' },
-        { cx: 180, cy: 45, val: 'Month 3: QA Release' },
-        { cx: 360, cy: 95, val: 'Month 4: Retrospective' },
-      ],
-    },
-  };
 
-  const currentChart = chartData[selectedChartFilter];
 
   const getProjectIcon = (iconName: string) => {
     switch (iconName?.toLowerCase()) {
@@ -232,7 +207,7 @@ export default function AdminConsole({
           value={activeCount}
           variant="primary"
           badge={`+${newCount} New`}
-          trend={{ value: '4.2% from last month', direction: 'up' }}
+          trend={metrics.trends?.activeProjects}
         />
 
         <StatCard
@@ -242,11 +217,8 @@ export default function AdminConsole({
           badge="Critical Check"
           badgeColor="text-rose-600 bg-rose-50 dark:bg-rose-900/40"
           variant="secondary"
-        >
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
-            16.6% Allocation
-          </p>
-        </StatCard>
+          trend={metrics.trends?.pendingApprovals}
+        />
 
         <StatCard
           icon={TrendingUp}
@@ -255,7 +227,7 @@ export default function AdminConsole({
           badge="Target: 95%"
           badgeColor="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40"
           variant="secondary"
-          trend={{ value: 'Operating at Peak Sprints', direction: 'up' }}
+          trend={metrics.trends?.teamProductivity}
         />
 
         {/* Revenue — full-width primary with gradient bg */}
@@ -277,233 +249,18 @@ export default function AdminConsole({
               ${metrics.monthlyRevenue}k
             </h3>
             <div className="text-blue-100 text-[10px] font-semibold mt-1.5 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              <span>Projected margin target — +12.4%</span>
+              {metrics.trends?.monthlyRevenue && (
+                <>
+                  <TrendingUp className="w-3 h-3" />
+                  <span>{metrics.trends.monthlyRevenue.value} from last period</span>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── Mini Stats Row ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          {
-            label: 'Client Engagement',
-            value: '87%',
-            detail: '14 comments, 6 approvals this week',
-          },
-          {
-            label: 'Upload Statistics',
-            value: '312 files',
-            detail: '98.4 GB protected',
-          },
-          {
-            label: 'Delivery Performance',
-            value: '94%',
-            detail: 'Average milestone accuracy',
-          },
-          {
-            label: 'Pending Revisions',
-            value: '7',
-            detail: '3 require admin review today',
-          },
-        ].map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => onTriggerAction(`${item.label} analytics opened.`)}
-            className="text-left bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 hover:shadow-sm hover:border-slate-200 dark:hover:border-slate-700 transition-all group"
-          >
-            <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              {item.label}
-            </p>
-            <p className="text-sm lg:text-base font-bold text-slate-900 dark:text-white mt-0.5">
-              {item.value}
-            </p>
-            <p className="text-[9px] text-slate-400 mt-0.5">{item.detail}</p>
-          </button>
-        ))}
-      </div>
 
-      {/* ─── Section: Analytics & Charts ─── */}
-      <SectionDivider icon={BarChart3} title="Analytics & Charts" />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="md:col-span-2 lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col transition-colors">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                Client Engagement
-              </h4>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Average digital touchpoints per active milestone over time
-              </p>
-            </div>
-            <button
-              type="button"
-              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-50 transition-colors"
-              aria-label="Chart options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="relative h-48 w-full group">
-            <svg
-              className="w-full h-full"
-              preserveAspectRatio="none"
-              viewBox="0 0 360 200"
-            >
-              <defs>
-                <linearGradient
-                  id="chartLineGradient"
-                  x1="0%"
-                  x2="0%"
-                  y1="0%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#2563EB" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <line
-                x1="0"
-                y1="50"
-                x2="360"
-                y2="50"
-                stroke="#F1F5F9"
-                strokeDasharray="4"
-                className="dark:stroke-slate-800"
-              />
-              <line
-                x1="0"
-                y1="100"
-                x2="360"
-                y2="100"
-                stroke="#F1F5F9"
-                strokeDasharray="4"
-                className="dark:stroke-slate-800"
-              />
-              <line
-                x1="0"
-                y1="150"
-                x2="360"
-                y2="150"
-                stroke="#F1F5F9"
-                strokeDasharray="4"
-                className="dark:stroke-slate-800"
-              />
-              <path
-                d={currentChart.fill}
-                fill="url(#chartLineGradient)"
-                className="transition-all duration-700 ease-in-out"
-              />
-              <path
-                d={currentChart.path}
-                fill="none"
-                stroke="#2563EB"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                className="transition-all duration-700 ease-in-out"
-              />
-              {currentChart.points.map((pt, idx) => (
-                <g key={idx}>
-                  <circle
-                    cx={pt.cx}
-                    cy={pt.cy}
-                    r="4.5"
-                    fill="#2563EB"
-                    stroke="#FFFFFF"
-                    strokeWidth="2"
-                    className="cursor-pointer hover:r-6 transition-all"
-                  />
-                  <title>{pt.val}</title>
-                </g>
-              ))}
-            </svg>
-            <div className="absolute bottom-[-18px] left-0 right-0 flex justify-between text-[9px] font-bold text-slate-400 px-1 font-mono uppercase">
-              {currentChart.labelValues.map((lbl) => (
-                <span key={lbl}>{lbl}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-sm flex flex-col h-full justify-between transition-colors">
-          <div>
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4">
-              Resource Allocation
-            </h4>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">
-                    Design Studio
-                  </span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-100">
-                    88%
-                  </span>
-                </div>
-                <ProgressMeter
-                  value={88}
-                  label="Design Studio allocation"
-                  className="progress-meter--tall"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">
-                    Engineering Sprints
-                  </span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-100">
-                    94%
-                  </span>
-                </div>
-                <ProgressMeter
-                  value={94}
-                  label="Engineering Sprints allocation"
-                  variant="emerald"
-                  className="progress-meter--tall"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">
-                    Governance & PMO
-                  </span>
-                  <span className="font-mono font-bold text-slate-800 dark:text-slate-100">
-                    62%
-                  </span>
-                </div>
-                <ProgressMeter
-                  value={62}
-                  label="Governance and PMO allocation"
-                  variant="amber"
-                  className="progress-meter--tall"
-                />
-              </div>
-            </div>
-          </div>
-          {showInsight && (
-            <div className="mt-5 p-3 rounded-lg bg-blue-50/50 dark:bg-slate-800/40 border border-blue-100/30 dark:border-slate-700/60 flex items-start gap-3 animate-in fade-in">
-              <div className="p-1 px-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 shrink-0">
-                <Lightbulb className="w-3.5 h-3.5" />
-              </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed flex-1">
-                Team is peaking in productivity. Consider adding 2 projects or
-                onboarding new design blocks.
-              </div>
-              <button
-                onClick={() => setShowInsight(false)}
-                className="text-[10px] text-slate-400 hover:text-slate-600 font-bold px-1"
-                title="Dismiss tip"
-              >
-                ×
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
         </>
       )}
 

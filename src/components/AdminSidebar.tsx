@@ -36,14 +36,6 @@ interface AdminSidebarProps {
   onNewProjectClick: () => void;
 }
 
-const teamMembers = [
-  { initials: 'JD', gradient: 'from-blue-400 to-blue-600' },
-  { initials: 'SC', gradient: 'from-emerald-400 to-emerald-600' },
-  { initials: 'AK', gradient: 'from-purple-400 to-purple-600' },
-  { initials: 'MR', gradient: 'from-rose-400 to-rose-600' },
-  { initials: 'TW', gradient: 'from-amber-400 to-amber-600' },
-];
-
 export default function AdminSidebar({
   currentRole,
   currentTab,
@@ -116,21 +108,10 @@ export default function AdminSidebar({
               <Users className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Online</span>
             </div>
-            <span className="text-[10px] text-slate-400">{teamMembers.length} members</span>
+            <span className="text-[10px] text-slate-400">0 members</span>
           </div>
           <div className="flex items-center mt-2">
             <div className="flex -space-x-1.5">
-              {teamMembers.slice(0, 3).map((member, i) => (
-                <div
-                  key={member.initials}
-                  className={`relative w-6 h-6 rounded-full bg-gradient-to-br ${member.gradient} border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-white`}
-                >
-                  {member.initials}
-                </div>
-              ))}
-              <div className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-slate-400">
-                +{teamMembers.length - 3}
-              </div>
             </div>
           </div>
         </div>

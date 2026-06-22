@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import ToggleSwitch from './ToggleSwitch';
 import AISummaryCard from './widgets/AISummaryCard';
+import EmptyState from './ui/EmptyState';
 import { initialsDataUri } from '../utils/avatar';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -30,6 +31,8 @@ import {
 } from 'lucide-react';
 import { Metrics } from '../types';
 import type { Project, User as AppUser } from '../types';
+
+import { api } from '../utils/api';
 
 interface SettingsProps {
   metrics: Metrics;
@@ -80,14 +83,7 @@ const defaultSettings: WorkspaceSettings = {
   teamSeats: 12,
 };
 
-const defaultIntegrations: IntegrationItem[] = [
-  { title: 'AWS S3 Storage', body: 'Secure files, signed downloads, folder sync.', icon: Cloud, status: 'Connected' },
-  { title: 'Cloudinary Media', body: 'Image previews, video transformations, thumbnails.', icon: UploadCloud, status: 'Ready' },
-  { title: 'Socket.io Realtime', body: 'Live chat, typing, read receipts, task updates.', icon: MessageCircle, status: 'Connected' },
-  { title: 'Google Calendar', body: 'Milestones, review calls, deployment windows.', icon: CalendarDays, status: 'Needs auth' },
-  { title: 'Custom Domain', body: 'Client branded portal domains and SSL.', icon: Globe, status: 'Connected' },
-  { title: 'PostgreSQL Database', body: 'Projects, users, approvals, audit trails.', icon: Database, status: 'Connected' },
-];
+
 
 function readStoredSettings(): WorkspaceSettings {
   try {
@@ -104,8 +100,44 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [removingAvatar, setRemovingAvatar] = useState(false);
   const [settings, setSettings] = useState<WorkspaceSettings>(readStoredSettings);
-  const [integrations, setIntegrations] = useState<IntegrationItem[]>(defaultIntegrations);
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<any>(null);
   const [lastSavedAt, setLastSavedAt] = useState('Not saved this session');
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const data = await api.getActivity();
+        setActivities(data);
+      } catch (err) {
+        console.error('Failed to fetch activity', err);
+      }
+    };
+    const fetchIntegrations = async () => {
+      try {
+        const data = await api.getIntegrations();
+        setIntegrations(data);
+      } catch (err) {
+        console.error('Failed to fetch integrations', err);
+      }
+    };
+    const fetchSubscription = async () => {
+      try {
+        const data = await api.getSubscription();
+        setSubscription(data);
+      } catch (err) {
+        console.error('Failed to fetch subscription', err);
+      }
+    };
+    if (activeTab === 'Security') {
+      fetchActivities();
+    } else if (activeTab === 'Integrations') {
+      fetchIntegrations();
+    } else if (activeTab === 'Billing') {
+      fetchSubscription();
+    }
+  }, [activeTab]);
 
   const domainError = settings.portalDomain.trim().length === 0 || settings.portalDomain.includes(' ');
 
@@ -411,15 +443,19 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
             <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Activity Log</h3>
             <div className="mt-4 space-y-3">
-              {['Client signed MSA', 'Mark uploaded demo video', 'Agency generated secure client link', 'Rate limit checked'].map((item) => (
-                <div key={item} className="flex items-start gap-3">
-                  <span className="mt-1 w-2 h-2 rounded-full bg-emerald-500" />
-                  <div>
-                    <p className="font-bold text-slate-700 dark:text-slate-200">{item}</p>
-                    <p className="text-[10px] text-slate-400">Logged just now</p>
+              {activities.length === 0 ? (
+                <div className="text-[11px] text-slate-400 italic">No recent activity</div>
+              ) : (
+                activities.slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex items-start gap-3">
+                    <span className="mt-1 w-2 h-2 rounded-full bg-emerald-500" />
+                    <div>
+                      <p className="font-bold text-slate-700 dark:text-slate-200">{item.message}</p>
+                      <p className="text-[10px] text-slate-400">{new Date(item.timestamp).toLocaleString()}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -462,26 +498,39 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
 
       {activeTab === 'Integrations' && currentRole === 'admin' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {integrations.map((integration) => {
-            const Icon = integration.icon;
-            return (
-              <div key={integration.title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
-                <div className="flex items-start justify-between">
-                  <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600">
-                    <Icon className="w-5 h-5" />
+          {integrations.length === 0 ? (
+            <div className="md:col-span-2 lg:col-span-3">
+              <EmptyState
+                icon={Cloud}
+                title="No integrations available"
+                description="Your workspace currently has no active integrations configured."
+              />
+            </div>
+          ) : (
+            integrations.map((integration) => {
+              const icons: Record<string, LucideIcon> = {
+                Cloud, UploadCloud, MessageCircle, CalendarDays, Globe, Database
+              };
+              const Icon = icons[integration.iconName] || Cloud;
+              return (
+                <div key={integration.name} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className={`text-[10px] font-black rounded-full px-2 py-1 ${integration.status === 'Needs auth' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                      {integration.status}
+                    </span>
                   </div>
-                  <span className={`text-[10px] font-black rounded-full px-2 py-1 ${integration.status === 'Needs auth' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                    {integration.status}
-                  </span>
+                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-4">{integration.name}</h3>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{integration.description}</p>
+                  <button onClick={() => onTriggerAction(`Configure ${integration.name}`)} className="mt-4 w-full rounded-xl border border-slate-200 dark:border-slate-800 py-2 text-xs font-black text-slate-700 dark:text-slate-200">
+                    {integration.status === 'Needs auth' ? 'Authorize' : 'Configure'}
+                  </button>
                 </div>
-                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-4">{integration.title}</h3>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{integration.body}</p>
-                <button onClick={() => configureIntegration(integration.title)} className="mt-4 w-full rounded-xl border border-slate-200 dark:border-slate-800 py-2 text-xs font-black text-slate-700 dark:text-slate-200">
-                  {integration.status === 'Needs auth' ? 'Authorize' : 'Configure'}
-                </button>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
 
@@ -499,21 +548,23 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
               <Users className="w-5 h-5 text-blue-600" />
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-3">Team Seats</h3>
-              <p className="text-[11px] text-slate-400 mt-1">{settings.teamSeats} active members, 3 agency members, 4 contractors.</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                {subscription ? `${subscription.teamSeatsCount} active members, ${subscription.agencyMembersCount} agency members, ${subscription.contractorsCount} contractors.` : 'No subscription data available.'}
+              </p>
               <button
                 onClick={() => {
-                  updateSetting('teamSeats', settings.teamSeats + 1);
                   onTriggerAction('Team member invited and seat count updated.');
                 }}
                 className="mt-4 w-full rounded-xl border border-slate-200 dark:border-slate-800 py-2 text-xs font-black"
               >
                 Invite Member
               </button>
+
             </div>
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
               <CheckCircle className="w-5 h-5 text-emerald-600" />
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-3">Premium Plan</h3>
-              <p className="text-[11px] text-slate-400 mt-1">White-label, automations, unlimited client portals, and secure file storage.</p>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-3">{subscription ? subscription.planName : '-'}</h3>
+              <p className="text-[11px] text-slate-400 mt-1">Status: {subscription ? subscription.status : 'No data'}</p>
             </div>
           </div>
         </div>

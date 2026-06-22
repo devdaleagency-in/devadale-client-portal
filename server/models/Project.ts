@@ -61,6 +61,13 @@ const ProjectSchema = new mongoose.Schema(
       type: String,
       default: "Just now",
     },
+    milestones: [{
+      _id: { type: String, required: true },
+      label: { type: String, required: true },
+      date: { type: String },
+      status: { type: String, enum: ['completed', 'active', 'planned'], default: 'planned' },
+      tone: { type: String, default: 'blue' }
+    }],
   },
   {
     timestamps: true,

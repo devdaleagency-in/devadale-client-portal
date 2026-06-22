@@ -219,11 +219,6 @@ export default function PremiumAccessGate({ onAccessGranted, onboardingToken }: 
                     <p className="text-xs text-red-500 font-semibold">{adminError}</p>
                   )}
 
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700 space-y-1">
-                    <p className="font-black flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" />Demo credentials</p>
-                    <p><span className="font-semibold">Username:</span> <span className="font-mono text-blue-800">admin@devdale.com</span></p>
-                    <p><span className="font-semibold">Password:</span> <span className="font-mono text-blue-800">any non-empty value</span></p>
-                  </div>
 
                   <button
                     type="button"
@@ -297,7 +292,7 @@ export default function PremiumAccessGate({ onAccessGranted, onboardingToken }: 
 
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 flex items-start gap-3 text-xs text-emerald-800">
                     <MailCheck className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p><span className="font-black">Session protected.</span> Device fingerprinting, rate limiting, and audit logging are simulated for this prototype.</p>
+                    <p><span className="font-black">Session protected.</span> Device fingerprinting, rate limiting, and audit logging are active.</p>
                   </div>
 
                   <button

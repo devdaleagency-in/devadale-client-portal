@@ -1,5 +1,6 @@
-import { useRef, useEffect } from 'react';
-import { MessageSquare, ArrowDown } from 'lucide-react';
+import { useRef, useEffect, useState, useMemo } from 'react';
+import { MessageSquare, Search, X } from 'lucide-react';
+import { format, isToday, isYesterday } from 'date-fns';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import TypingIndicator from './TypingIndicator';
@@ -12,7 +13,7 @@ interface ChatWindowProps {
   typingUsers: TypingUser[];
   currentUserId: string;
   currentUserRole: 'admin' | 'client';
-  onSend: (text: string) => void;
+  onSend: (text: string, files?: File[]) => void;
   onTyping?: (isTyping: boolean) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -20,13 +21,17 @@ interface ChatWindowProps {
   connectionStatus: ConnectionStatus;
   conversationName?: string;
   emptyPlaceholder?: string;
+  presence?: { isOnline: boolean; lastSeen: Date | null } | null;
+  searchQuery?: string;
+  setSearchQuery?: (q: string) => void;
 }
 
 export default function ChatWindow({
   messages, typingUsers, currentUserId, currentUserRole,
   onSend, onTyping, onLoadMore, hasMore, loading, connectionStatus,
-  conversationName, emptyPlaceholder,
+  conversationName, emptyPlaceholder, presence, searchQuery, setSearchQuery,
 }: ChatWindowProps) {
+  const [isSearching, setIsSearching] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -67,15 +72,67 @@ export default function ChatWindow({
       return msg?.senderId?.name || 'Someone';
     });
 
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery) return messages;
+    return messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [messages, searchQuery]);
+
+  // Group messages by date
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; msgs: ChatMessage[] }[] = [];
+    let currentDate = '';
+    
+    filteredMessages.forEach(msg => {
+      const dateObj = new Date(msg.createdAt);
+      let dateLabel = format(dateObj, 'MMM d, yyyy');
+      if (isToday(dateObj)) dateLabel = 'Today';
+      else if (isYesterday(dateObj)) dateLabel = 'Yesterday';
+
+      if (currentDate !== dateLabel) {
+        currentDate = dateLabel;
+        groups.push({ date: dateLabel, msgs: [] });
+      }
+      groups[groups.length - 1].msgs.push(msg);
+    });
+    return groups;
+  }, [filteredMessages]);
+
   return (
     <div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950/20">
       <ConnectionStatusIndicator status={connectionStatus} />
 
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0">
-        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-          {conversationName || 'Project Chat'}
-        </h3>
+      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shrink-0 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            {conversationName || 'Project Chat'}
+            {presence?.isOnline && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+          </h3>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {presence?.isOnline ? 'Online' : presence?.lastSeen ? `Last seen ${format(new Date(presence.lastSeen), 'h:mm a')}` : 'Offline'}
+          </div>
+        </div>
+        
+        {isSearching ? (
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-2 py-1">
+            <Search className="w-4 h-4 text-slate-400" />
+            <input 
+              autoFocus
+              type="text" 
+              value={searchQuery || ''} 
+              onChange={e => setSearchQuery?.(e.target.value)}
+              placeholder="Search messages..."
+              className="bg-transparent border-none outline-none text-sm w-32 md:w-48"
+            />
+            <button onClick={() => { setIsSearching(false); setSearchQuery?.(''); }} className="text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setIsSearching(true)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+            <Search className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -92,25 +149,44 @@ export default function ChatWindow({
           </div>
         )}
 
-        {messages.length === 0 && !loading && (
+        {messages.length === 0 && !loading && !searchQuery && (
           <div className="flex flex-col items-center justify-center h-full text-xs text-slate-400 gap-3">
             <MessageSquare className="w-10 h-10 opacity-30" />
             <span>{emptyPlaceholder || 'No messages yet. Start the conversation!'}</span>
           </div>
         )}
 
-        {messages.map((msg) => {
-          const isSelf = msg.senderId._id === currentUserId;
-          return <div key={msg._id}><MessageBubble
-            content={msg.content}
-            timestamp={msg.createdAt}
-            isSelf={isSelf}
-            senderName={msg.senderId.name}
-            senderAvatar={msg.senderId.avatarUrl}
-            deliveryStatus={msg.deliveryStatus}
-            isRead={msg.isRead}
-          /></div>;
-        })}
+        {filteredMessages.length === 0 && searchQuery && (
+          <div className="flex items-center justify-center py-10 text-sm text-slate-500">
+            No matching messages found.
+          </div>
+        )}
+
+        {groupedMessages.map((group) => (
+          <div key={group.date}>
+            <div className="flex justify-center my-4">
+              <span className="px-3 py-1 bg-slate-200/50 dark:bg-slate-800 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 shadow-sm">
+                {group.date}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {group.msgs.map((msg) => {
+                const isSelf = msg.senderId._id === currentUserId;
+                return <div key={msg._id}><MessageBubble
+                  content={msg.content}
+                  timestamp={msg.createdAt}
+                  isSelf={isSelf}
+                  senderName={msg.senderId.name}
+                  senderAvatar={msg.senderId.avatarUrl}
+                  deliveryStatus={msg.deliveryStatus}
+                  isRead={msg.isRead}
+                  currentUserRole={currentUserRole}
+                  attachments={msg.attachments}
+                /></div>;
+              })}
+            </div>
+          </div>
+        ))}
 
         <TypingIndicator usernames={typingNames} />
         <div ref={bottomRef} />

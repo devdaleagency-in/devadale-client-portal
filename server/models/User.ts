@@ -22,6 +22,8 @@ export interface IUser {
   lockUntil: Date | null;
   assignedProjects: string[];
   tokenVersion: number;
+  lastSeen: Date | null;
+  isOnline: boolean;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -47,6 +49,8 @@ const userSchema = new Schema<IUser>(
     lockUntil: { type: Date, default: null },
     assignedProjects: [{ type: String, ref: 'Project' }],
     tokenVersion: { type: Number, default: 0 },
+    lastSeen: { type: Date, default: null },
+    isOnline: { type: Boolean, default: false },
   },
   { timestamps: true, _id: false }
 );

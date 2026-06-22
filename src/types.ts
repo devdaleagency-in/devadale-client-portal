@@ -12,6 +12,14 @@ export interface User {
   title: string;
 }
 
+export interface Milestone {
+  id: string;
+  label: string;
+  date: string;
+  status: 'completed' | 'active' | 'planned';
+  tone: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -25,6 +33,7 @@ export interface Project {
   nextMilestoneDate: string;
   team: TeamMember[];
   description: string;
+  milestones?: Milestone[];
 }
 
 export interface Agreement {
@@ -40,6 +49,32 @@ export interface Metrics {
   pendingApprovals: number;
   teamProductivity: number;
   monthlyRevenue: number;
+  trends?: {
+    activeProjects?: { value: string; direction: 'up' | 'down' };
+    teamProductivity?: { value: string; direction: 'up' | 'down' };
+    monthlyRevenue?: { value: string; direction: 'up' | 'down' };
+  };
+}
+
+export interface Integration {
+  id: string;
+  name: string;
+  description: string;
+  iconName: string;
+  status: 'Connected' | 'Needs auth' | 'Ready';
+  workspaceId: string;
+  lastSyncedAt?: string;
+}
+
+export interface Subscription {
+  id: string;
+  workspaceId: string;
+  planName: string;
+  teamSeatsCount: number;
+  agencyMembersCount: number;
+  contractorsCount: number;
+  status: 'active' | 'past_due' | 'canceled' | 'trialing';
+  renewalDate?: string;
 }
 
 export interface ActivityFeed {

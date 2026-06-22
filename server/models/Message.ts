@@ -6,9 +6,18 @@ const MessageSchema = new mongoose.Schema({
   senderRole: { type: String, enum: ['client', 'admin', 'super_admin', 'team_member'], required: true },
   conversationId: { type: String, required: true, index: true },
   projectId: { type: String, required: true },
-  content: { type: String, required: true, maxlength: 5000 },
+  content: { type: String, default: '', maxlength: 5000 },
   isRead: { type: Boolean, default: false },
-  deliveryStatus: { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent' },
+  deliveryStatus: { type: String, enum: ['sending', 'sent', 'delivered', 'read'], default: 'delivered' },
+  deliveredAt: { type: Date },
+  readAt: { type: Date },
+  receiverId: { type: String, index: true },
+  attachments: [{
+    url: String,
+    name: String,
+    type: { type: String },
+    size: Number
+  }],
 }, { timestamps: true });
 
 MessageSchema.index({ conversationId: 1, createdAt: -1 });

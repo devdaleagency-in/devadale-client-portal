@@ -18,6 +18,7 @@ export default function RealtimeChat({ currentUserId, currentUserRole, emptyPlac
 
   const {
     messages, conversations, typingUsers, loading, sendMessage, emitTyping, loadMore, hasMore,
+    searchQuery, setSearchQuery, onlineUsers
   } = useChat({
     conversationId: activeConversationId,
     currentUserId,
@@ -26,6 +27,10 @@ export default function RealtimeChat({ currentUserId, currentUserRole, emptyPlac
 
   const activeConv = conversations.find(c => c._id === activeConversationId);
   const conversationName = activeConv?.projectId?.name || activeConv?.clientId?.name;
+  
+  // Find the other user's presence
+  const otherUserId = currentUserRole === 'admin' ? activeConv?.clientId?._id : activeConv?.adminIds?.[0];
+  const presence = otherUserId ? onlineUsers[otherUserId] : null;
 
   const handleTyping = useCallback((isTyping: boolean) => {
     emitTyping(isTyping);
@@ -68,6 +73,9 @@ export default function RealtimeChat({ currentUserId, currentUserRole, emptyPlac
             connectionStatus={connectionStatus}
             conversationName={conversationName}
             emptyPlaceholder={emptyPlaceholder}
+            presence={presence}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
           />
         )}
       </div>

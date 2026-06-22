@@ -31,34 +31,49 @@ interface AdminDeliverablesProps {
   onTriggerAction: (msg: string) => void;
 }
 
-const initialFiles = [
-  { name: 'Logo_Primary.svg', type: 'Logo', size: '2.4 MB', tag: 'brand', icon: Image, progress: 100, version: 'v3', status: 'approved' as const },
-  { name: 'Homepage_Demo.mp4', type: 'Video', size: '48 MB', tag: 'review', icon: Video, progress: 82, version: 'v4', status: 'review' as const },
-  { name: 'Requirements_v3.pdf', type: 'PDF', size: '1.8 MB', tag: 'scope', icon: FileText, progress: 100, version: 'v3', status: 'approved' as const },
-  { name: 'Brand_Assets.zip', type: 'ZIP', size: '96 MB', tag: 'handoff', icon: FileArchive, progress: 100, version: 'v2', status: 'archived' as const },
-];
+import { api } from '../utils/api';
 
-const versionHistory = [
-  { version: 'v4', date: 'Today, 2:30 PM', status: 'In Review', author: 'Sarah Chen', changes: 'Homepage hero animation updated' },
-  { version: 'v3', date: 'Yesterday, 4:15 PM', status: 'Approved', author: 'Admin User', changes: 'Final branding applied' },
-  { version: 'v2', date: '3 days ago', status: 'Archived', author: 'Sarah Chen', changes: 'Color palette revision' },
-  { version: 'v1', date: '1 week ago', status: 'Archived', author: 'Sarah Chen', changes: 'Initial upload' },
-];
+interface FileDoc {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  tag: string;
+  path?: string;
+  uploadedAt: string;
+}
 
 export default function AdminDeliverables({ onTriggerAction }: AdminDeliverablesProps) {
   const [fileSearch, setFileSearch] = useState('');
   const [selectedFileTag, setSelectedFileTag] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<typeof initialFiles[0] | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState('v4');
+  const [previewFile, setPreviewFile] = useState<any | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState('v1');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [publishState, setPublishState] = useState<'idle' | 'published' | 'review'>('review');
 
+  const [files, setFiles] = useState<FileDoc[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        const fetchedFiles = await api.getFiles();
+        setFiles(fetchedFiles);
+      } catch (err) {
+        console.error('Failed to fetch files', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFiles();
+  }, []);
+
   const fileQuery = fileSearch.trim().toLowerCase();
-  const filteredFiles = initialFiles.filter((f) => {
-    if (fileQuery && !f.name.toLowerCase().includes(fileQuery) && !f.type.toLowerCase().includes(fileQuery) && !f.tag.toLowerCase().includes(fileQuery)) {
+  const filteredFiles = files.filter((f) => {
+    if (fileQuery && !f.name.toLowerCase().includes(fileQuery) && !f.type.toLowerCase().includes(fileQuery) && !(f.tag || '').toLowerCase().includes(fileQuery)) {
       return false;
     }
-    if (selectedFileTag && f.tag !== selectedFileTag.toLowerCase()) {
+    if (selectedFileTag && (f.tag || '').toLowerCase() !== selectedFileTag.toLowerCase()) {
       return false;
     }
     return true;
@@ -72,18 +87,17 @@ export default function AdminDeliverables({ onTriggerAction }: AdminDeliverables
     e.target.value = '';
   };
 
-  const handleDownload = (file: typeof initialFiles[0]) => {
-    const blob = new Blob([`Simulated download: ${file.name}`], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name.replace(/\.[^.]+$/, '.txt');
-    a.click();
-    URL.revokeObjectURL(url);
-    onTriggerAction(`${file.name} downloaded.`);
+  const handleDownload = (file: any) => {
+    if (file.path) {
+      window.open(file.path, '_blank');
+      onTriggerAction(`${file.name} downloaded.`);
+    } else {
+      onTriggerAction(`Download failed for ${file.name}`);
+    }
   };
 
-  const currentVersion = versionHistory.find(v => v.version === selectedVersion) || versionHistory[0];
+  const versionHistory: any[] = []; // Version history fetched from API in future
+  const currentVersion = versionHistory[0];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 px-2 max-w-7xl mx-auto w-full">
@@ -117,10 +131,10 @@ export default function AdminDeliverables({ onTriggerAction }: AdminDeliverables
       {/* Status Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'In Review', value: '2', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/20' },
-          { label: 'Approved', value: '5', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20' },
-          { label: 'Pending Client', value: '1', icon: AlertCircle, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/20' },
-          { label: 'Archived', value: '3', icon: Archive, color: 'text-slate-600', bg: 'bg-slate-50 dark:bg-slate-950/20' },
+          { label: 'In Review', value: '0', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/20' },
+          { label: 'Approved', value: '0', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20' },
+          { label: 'Pending Client', value: '0', icon: AlertCircle, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/20' },
+          { label: 'Archived', value: '0', icon: Archive, color: 'text-slate-600', bg: 'bg-slate-50 dark:bg-slate-950/20' },
         ].map((stat) => (
           <div key={stat.label} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-3 flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg ${stat.bg} flex items-center justify-center shrink-0`}>
@@ -203,11 +217,9 @@ export default function AdminDeliverables({ onTriggerAction }: AdminDeliverables
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{file.name}</h4>
-                        <span className="text-[9px] uppercase font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{file.tag}</span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>{file.version}</span>
+                        <span className="text-[9px] uppercase font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{file.tag || 'general'}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{file.type} • {file.size} • {file.status}</p>
-                      <ProgressMeter value={file.progress} label={`Upload progress for ${file.name}`} variant="emerald" className="mt-2 progress-meter--tall" />
+                      <p className="text-[10px] text-slate-400 mt-0.5">{file.type} • {file.size}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => setPreviewFile(file)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -326,21 +338,8 @@ export default function AdminDeliverables({ onTriggerAction }: AdminDeliverables
           <h3 className="text-sm font-black text-slate-800 dark:text-slate-100">Delivery Activity Log</h3>
         </div>
         <div className="space-y-2">
-          {[
-            { action: 'Version v4 uploaded by Sarah Chen', time: '2:30 PM today' },
-            { action: 'Client Alex requested changes on Homepage Demo', time: '1:15 PM today' },
-            { action: 'Version v3 approved and locked', time: 'Yesterday, 4:20 PM' },
-            { action: 'Client notified about v3', time: 'Yesterday, 4:25 PM' },
-            { action: 'Version v2 archived', time: '3 days ago' },
-          ].map((entry, i) => (
-            <div key={i} className="flex items-start gap-3 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
-              <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{entry.action}</p>
-                <p className="text-[10px] text-slate-400">{entry.time}</p>
-              </div>
-            </div>
-          ))}
+          {/* Real activity from API will populate here */}
+          <div className="text-center py-4 text-xs text-slate-400 italic">No recent activity</div>
         </div>
       </div>
 

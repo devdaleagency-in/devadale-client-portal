@@ -138,6 +138,12 @@ export const api = {
   getActivity: () => request<any[]>('/activity'),
 
   getMetrics: () => request<any>('/metrics'),
+  getIntegrations: () => request<any[]>('/integrations'),
+  updateIntegration: (id: string, status: string) => request<any>(`/integrations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status })
+  }),
+  getSubscription: () => request<any>('/subscription'),
 
   getMsaStatus: () => request<{ msaStatus: string }>('/msa-status'),
 

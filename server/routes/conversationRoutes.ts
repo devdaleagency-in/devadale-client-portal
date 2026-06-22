@@ -145,54 +145,5 @@ router.get('/:id/messages', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/seed', async (_req: Request, res: Response) => {
-  try {
-    const existing = await Conversation.findOne();
-    if (existing) return res.json({ message: 'Conversations already seeded' });
-
-    const conv = await Conversation.create({
-      projectId: 'proj-focus',
-      projectName: 'DevDale Agency',
-      clientId: 'user-2',
-      clientName: 'Sarah Chen',
-      adminIds: ['user-1'],
-      lastMessage: null,
-    });
-
-    await Message.create({
-      senderId: 'user-2',
-      senderName: 'Sarah Chen',
-      senderRole: 'client',
-      conversationId: conv._id.toString(),
-      projectId: 'proj-focus',
-      content: 'Hi! I had a question about the V1 prototype timeline. When can we expect the first review?',
-      deliveryStatus: 'sent',
-    });
-
-    await Message.create({
-      senderId: 'user-1',
-      senderName: 'Admin User',
-      senderRole: 'admin',
-      conversationId: conv._id.toString(),
-      projectId: 'proj-focus',
-      content: 'Hi Sarah! The V1 prototype is on track for Friday, Oct 27. I will share the Figma link with you by Thursday for early feedback.',
-      deliveryStatus: 'read',
-      isRead: true,
-    });
-
-    await Conversation.findByIdAndUpdate(conv._id, {
-      lastMessage: {
-        content: 'Hi Sarah! The V1 prototype is on track for Friday, Oct 27.',
-        senderId: 'user-1',
-        senderRole: 'admin',
-        timestamp: new Date(),
-      },
-    });
-
-    res.json({ message: 'Conversation seeded', conversationId: conv._id });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to seed conversations' });
-  }
-});
 
 export default router;

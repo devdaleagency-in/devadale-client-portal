@@ -7,6 +7,9 @@ export interface ChatMessage {
   content: string;
   isRead: boolean;
   deliveryStatus: 'sending' | 'sent' | 'delivered' | 'read';
+  attachments?: { url: string; name: string; type: string; size: number }[];
+  deliveredAt?: string;
+  readAt?: string;
   createdAt: string;
   updatedAt: string;
 }

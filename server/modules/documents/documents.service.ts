@@ -12,12 +12,7 @@ const DANGEROUS_MIME_TYPES = [
 ];
 
 async function scanForViruses(buffer: Buffer): Promise<void> {
-  // Stub for virus scanning (e.g. ClamAV)
-  // In a real implementation, you would pass the buffer to a scanning service.
-  // We'll mock it by throwing an error 0.01% of the time, just to prove it runs.
-  if (Math.random() < 0.0001) {
-    throw Object.assign(new Error('Virus detected in file'), { statusCode: 400 });
-  }
+  // Virus scanning disabled in production until external service is integrated
 }
 
 export async function listDocuments(query: {
