@@ -1,4 +1,4 @@
-import { CheckCheck, Clock } from 'lucide-react';
+import { CheckCheck, Clock, Check } from 'lucide-react';
 
 interface MessageBubbleProps {
   content: string;
@@ -6,7 +6,7 @@ interface MessageBubbleProps {
   isSelf: boolean;
   senderName: string;
   senderAvatar?: string;
-  deliveryStatus?: 'sent' | 'delivered' | 'read';
+  deliveryStatus?: 'sending' | 'sent' | 'delivered' | 'read';
   isRead?: boolean;
 }
 
@@ -43,6 +43,8 @@ export default function MessageBubble({ content, timestamp, isSelf, senderName, 
               <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
             ) : deliveryStatus === 'delivered' ? (
               <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+            ) : deliveryStatus === 'sent' ? (
+              <Check className="w-3.5 h-3.5 text-slate-400" />
             ) : (
               <Clock className="w-3 h-3 text-slate-400" />
             )

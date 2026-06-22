@@ -15,7 +15,7 @@ async function getDisplayName(userId: string): Promise<string> {
 }
 
 export function registerMessageHandler(io: Server, socket: AuthSocket) {
-  socket.on('sendMessage', async (data: { conversationId: string; projectId: string; content: string }) => {
+  socket.on('sendMessage', async (data: { conversationId: string; projectId: string; content: string; tempId?: string }, callback?: (response: any) => void) => {
     if (!socket.userId || !socket.userRole) return;
     if (!data.content || data.content.length > 5000) return;
     if (!data.conversationId || !data.projectId) return;
@@ -31,7 +31,8 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
       const isClient = conversation.clientId === socket.userId;
       const isAdmin = conversation.adminIds?.includes(socket.userId);
       if (!isClient && !isAdmin) {
-        socket.emit('error', { message: 'Access denied' });
+        if (callback) callback({ success: false, error: 'Access denied' });
+        else socket.emit('error', { message: 'Access denied' });
         return;
       }
 
@@ -47,7 +48,8 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
       }));
 
       if (!message) {
-        socket.emit('error', { message: 'Failed to create message' });
+        if (callback) callback({ success: false, error: 'Failed to create message' });
+        else socket.emit('error', { message: 'Failed to create message' });
         return;
       }
 
@@ -97,18 +99,54 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
         updatedAt: message.updatedAt,
       };
 
-      io.to(room).emit('receiveMessage', enriched);
+      // Acknowledge the sender
+      if (callback) {
+        callback({ success: true, message: enriched, tempId: data.tempId });
+      }
+
+      // Emit to the conversation room (excluding sender if they use the room, but they rely on ACK now)
+      socket.to(room).emit('receiveMessage', enriched);
       io.to(room).emit('conversationUpdated', {
         conversationId: data.conversationId,
         lastMessage: {
           content: data.content,
           senderId: socket.userId,
-        senderRole: socket.userRole as 'admin' | 'client',
+          senderRole: socket.userRole as 'admin' | 'client',
           timestamp: new Date(),
         },
       });
+
+      // Also push to the global rooms of all OTHER participants so they get it in background
+      const participants = conversation.clientId === socket.userId 
+        ? (conversation.adminIds || [])
+        : [conversation.clientId].filter(Boolean);
+        
+      for (const p of participants) {
+        if (p && p !== socket.userId) {
+          io.to(p).emit('receiveMessage', enriched);
+        }
+      }
+
     } catch (err) {
-      socket.emit('error', { message: 'Failed to send message' });
+      if (callback) callback({ success: false, error: 'Failed to send message' });
+      else socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  socket.on('markAsDelivered', async (data: { conversationId: string; messageIds: string[]; senderId: string }) => {
+    if (!socket.userId || !data.conversationId || !data.messageIds?.length) return;
+    try {
+      await Message.updateMany(
+        { _id: { $in: data.messageIds }, conversationId: data.conversationId, deliveryStatus: 'sent' },
+        { deliveryStatus: 'delivered' }
+      );
+      // Notify the sender that their messages were delivered
+      io.to(data.senderId).emit('messagesDelivered', {
+        conversationId: data.conversationId,
+        messageIds: data.messageIds,
+      });
+    } catch {
+      // Silently fail delivery acks to avoid noise
     }
   });
 
@@ -130,6 +168,15 @@ export function registerMessageHandler(io: Server, socket: AuthSocket) {
 
       const room = `conversation_${data.conversationId}`;
       io.to(room).emit('messagesRead', { conversationId: data.conversationId, userId: socket.userId });
+
+      // Find the sender(s) of these messages to notify their global room
+      const messages = await Message.find({ _id: { $in: data.messageIds } }).select('senderId');
+      const senderIds = [...new Set(messages.map(m => m.senderId))];
+      for (const sId of senderIds) {
+        if (sId !== socket.userId) {
+          io.to(sId).emit('messagesRead', { conversationId: data.conversationId, userId: socket.userId, messageIds: data.messageIds });
+        }
+      }
     } catch {
       socket.emit('error', { message: 'Failed to mark as read' });
     }

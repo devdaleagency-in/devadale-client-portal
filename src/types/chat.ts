@@ -6,7 +6,7 @@ export interface ChatMessage {
   projectId: string;
   content: string;
   isRead: boolean;
-  deliveryStatus: 'sent' | 'delivered' | 'read';
+  deliveryStatus: 'sending' | 'sent' | 'delivered' | 'read';
   createdAt: string;
   updatedAt: string;
 }

@@ -77,21 +77,55 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
   // Send message
   const sendMessage = useCallback(async (content: string) => {
     if (!conversationId || !content.trim()) return;
-    update({ sending: true });
 
     const socket = getSocket();
+    const tempId = `temp-${Date.now()}`;
+    const newMsgContent = content.trim();
+
+    // Optimistically append the message as "sending"
+    update({
+      messages: [...state.messages, {
+        _id: tempId,
+        content: newMsgContent,
+        conversationId,
+        projectId: state.activeConversation?.projectId?._id || '',
+        senderId: { _id: currentUserId, name: '', email: '', role: currentUserRole },
+        senderRole: currentUserRole,
+        isRead: false,
+        deliveryStatus: 'sending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }],
+      sending: true,
+    });
+
     if (socket?.connected) {
-      socket.emit('sendMessage', { conversationId, projectId: state.activeConversation?.projectId?._id, content: content.trim() });
+      socket.emit('sendMessage', { 
+        conversationId, 
+        projectId: state.activeConversation?.projectId?._id, 
+        content: newMsgContent, 
+        tempId 
+      }, (res: any) => {
+        if (res.success && res.message) {
+          setState(prev => ({
+            ...prev,
+            messages: prev.messages.map(m => m._id === res.tempId ? res.message : m),
+            sending: false,
+          }));
+        } else {
+          update({ sending: false });
+        }
+      });
     } else {
       try {
-        await api.sendMessage(content);
+        await api.sendMessage(newMsgContent);
         await fetchMessages(conversationId, 1);
       } catch {
         // fallback
       }
+      update({ sending: false });
     }
-    update({ sending: false });
-  }, [conversationId, state.activeConversation, update, fetchMessages]);
+  }, [conversationId, state.activeConversation, state.messages, currentUserId, currentUserRole, update, fetchMessages]);
 
   // Emit typing
   const emitTyping = useCallback((isTyping: boolean) => {
@@ -129,12 +163,23 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
       fetchConversations();
     };
 
-    const handleMessagesRead = (data: { conversationId: string; userId: string }) => {
+    const handleMessagesRead = (data: { conversationId: string; userId: string; messageIds?: string[] }) => {
       setState(prev => ({
         ...prev,
         messages: prev.messages.map(m =>
-          m.conversationId === data.conversationId && m.senderId._id !== currentUserId
+          m.conversationId === data.conversationId && m.senderId._id !== currentUserId && (!data.messageIds || data.messageIds.includes(m._id))
             ? { ...m, isRead: true, deliveryStatus: 'read' as const }
+            : m
+        ),
+      }));
+    };
+
+    const handleMessagesDelivered = (data: { conversationId: string; messageIds: string[] }) => {
+      setState(prev => ({
+        ...prev,
+        messages: prev.messages.map(m =>
+          m.conversationId === data.conversationId && data.messageIds.includes(m._id) && m.deliveryStatus !== 'read'
+            ? { ...m, deliveryStatus: 'delivered' as const }
             : m
         ),
       }));
@@ -161,6 +206,7 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
 
     socket.on('receiveMessage', handleReceiveMessage);
     socket.on('messagesRead', handleMessagesRead);
+    socket.on('messagesDelivered', handleMessagesDelivered);
     socket.on('userTyping', handleUserTyping);
     socket.on('userStopTyping', handleUserStopTyping);
     socket.on('conversationUpdated', handleConversationUpdated);
@@ -168,6 +214,7 @@ export function useChat({ conversationId, currentUserId, currentUserRole }: UseC
     return () => {
       socket.off('receiveMessage', handleReceiveMessage);
       socket.off('messagesRead', handleMessagesRead);
+      socket.off('messagesDelivered', handleMessagesDelivered);
       socket.off('userTyping', handleUserTyping);
       socket.off('userStopTyping', handleUserStopTyping);
       socket.off('conversationUpdated', handleConversationUpdated);

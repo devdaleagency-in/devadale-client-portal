@@ -19,6 +19,10 @@ export function setupSocketIO(server: HttpServer) {
   io.use(authMiddleware);
 
   io.on('connection', (socket: AuthSocket) => {
+    if (socket.userId) {
+      socket.join(socket.userId);
+    }
+    
     if (socket.userRole === 'admin' || socket.userRole === 'super_admin') {
       socket.join('admins');
     }

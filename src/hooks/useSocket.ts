@@ -27,11 +27,25 @@ export function useSocket() {
     const onReconnecting = () => setStatus('reconnecting');
     const onConnectError = () => setStatus('disconnected');
 
+    const onReceiveMessage = (msg: any) => {
+      // If we received a message globally, we should emit markAsDelivered
+      // But only if we didn't send it ourselves
+      const currentUser = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      if (msg.senderId._id !== currentUser._id) {
+        socket.emit('markAsDelivered', {
+          conversationId: msg.conversationId,
+          messageIds: [msg._id],
+          senderId: msg.senderId._id
+        });
+      }
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('reconnect', onReconnect);
     socket.on('reconnecting', onReconnecting);
     socket.on('connect_error', onConnectError);
+    socket.on('receiveMessage', onReceiveMessage);
 
     if (socket.connected) setStatus('connected');
 
@@ -41,6 +55,7 @@ export function useSocket() {
       socket.off('reconnect', onReconnect);
       socket.off('reconnecting', onReconnecting);
       socket.off('connect_error', onConnectError);
+      socket.off('receiveMessage', onReceiveMessage);
     };
   }, []);
 
