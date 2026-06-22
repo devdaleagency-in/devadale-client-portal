@@ -48,11 +48,11 @@ export function signRefreshToken(userId: string, role: string, tokenVersion: num
 }
 
 export function verifyAccessToken(token: string): TokenPayload {
-  return jwt.verify(token, config.jwt.accessSecret, { issuer: config.jwt.issuer }) as TokenPayload;
+  return jwt.verify(token, config.jwt.accessSecret, { issuer: config.jwt.issuer, audience: config.jwt.audience }) as TokenPayload;
 }
 
 export function verifyRefreshToken(token: string): TokenPayload {
-  return jwt.verify(token, config.jwt.refreshSecret, { issuer: config.jwt.issuer }) as TokenPayload;
+  return jwt.verify(token, config.jwt.refreshSecret, { issuer: config.jwt.issuer, audience: config.jwt.audience }) as TokenPayload;
 }
 
 export async function isTokenBlacklisted(jti: string): Promise<boolean> {

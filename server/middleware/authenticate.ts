@@ -8,6 +8,7 @@ declare global {
       user?: {
         userId: string;
         role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
+        tokenVersion?: number;
       };
     }
   }
@@ -47,7 +48,7 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       return res.status(401).json({ error: 'Token has been invalidated due to password change', code: 'TOKEN_VERSION_MISMATCH' });
     }
 
-    req.user = { userId: user._id.toString(), role: user.role };
+    req.user = { userId: user._id.toString(), role: user.role, tokenVersion: user.tokenVersion };
     next();
   } catch (err: any) {
     if (err.name === 'TokenExpiredError') {
@@ -57,7 +58,7 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
   }
 }
 
-export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     return next();
@@ -68,7 +69,8 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 
   try {
     const payload = verifyAccessToken(token);
-    req.user = { userId: payload.sub, role: payload.role };
+    const user = await User.findById(payload.sub).select('tokenVersion');
+    req.user = { userId: payload.sub, role: payload.role, tokenVersion: user?.tokenVersion };
   } catch {
     // ignore invalid tokens for optional auth
   }

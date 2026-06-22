@@ -44,7 +44,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
   }
 });
 
-router.post('/refresh', validate(refreshSchema), async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -162,8 +162,6 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
     if (!isMatch) return res.status(400).json({ error: 'Current password is incorrect' });
 
     user.password = req.body.newPassword;
-    await user.save();
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
     
     await authService.logoutAllSessions(req.user!.userId);
