@@ -163,6 +163,10 @@ router.post('/change-password', authenticate, validate(changePasswordSchema), as
 
     user.password = req.body.newPassword;
     await user.save();
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+    
+    await authService.logoutAllSessions(req.user!.userId);
 
     res.json({ message: 'Password changed successfully' });
   } catch (err: any) {

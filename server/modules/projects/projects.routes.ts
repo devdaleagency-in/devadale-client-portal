@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize, adminOnly, adminOrTeamMember } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
+import { requireProjectAccess } from '../../middleware/resourceGuard';
 import * as projectsController from './projects.controller';
 import { createProjectSchema, updateProjectSchema } from './projects.validators';
 

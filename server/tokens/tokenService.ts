@@ -26,6 +26,7 @@ export function signAccessToken(userId: string, role: string, tokenVersion: numb
   return jwt.sign(payload, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiresIn as any,
     issuer: config.jwt.issuer,
+    audience: config.jwt.audience,
   });
 }
 
@@ -41,6 +42,7 @@ export function signRefreshToken(userId: string, role: string, tokenVersion: num
   const token = jwt.sign(payload, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshExpiresIn as any,
     issuer: config.jwt.issuer,
+    audience: config.jwt.audience,
   });
   return { token, jti };
 }

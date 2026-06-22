@@ -9,16 +9,6 @@ const REFRESH_KEY = 'devdale-refresh-token';
 
 let _initialized = false;
 
-function getRefreshToken(): string | null {
-  try { return localStorage.getItem(REFRESH_KEY); } catch { return null; }
-}
-
-function setRefreshToken(token: string | null) {
-  try {
-    if (token) localStorage.setItem(REFRESH_KEY, token);
-    else localStorage.removeItem(REFRESH_KEY);
-  } catch {}
-}
 
 export function useAuth() {
   const { user, isAuthenticated, isLoading, setUser, setLoading, logout: clearStore } = useAuthStore();
@@ -26,12 +16,7 @@ export function useAuth() {
 
   const initialize = useCallback(async () => {
     const accessToken = getAuthToken();
-    const refreshToken = getRefreshToken();
 
-    if (!accessToken && !refreshToken) {
-      setLoading(false);
-      return;
-    }
 
     if (accessToken) {
       try {
@@ -44,24 +29,18 @@ export function useAuth() {
       }
     }
 
-    if (refreshToken) {
-      try {
-        const tokens = await authService.refreshToken(refreshToken);
-        setAuthToken(tokens.accessToken);
-        setRefreshToken(tokens.refreshToken);
-        const { user } = await authService.getMe();
-        setUser(user);
-        connectSocket(tokens.accessToken);
-        return;
-      } catch {
-        // both tokens expired
-        clearAuthToken();
-        setRefreshToken(null);
-        setLoading(false);
-      }
+    // Refresh relies on httpOnly cookie, so if no accessToken, we try to refresh once
+    try {
+      const tokens = await authService.refreshToken();
+      setAuthToken(tokens.accessToken);
+      const { user } = await authService.getMe();
+      setUser(user);
+      connectSocket(tokens.accessToken);
+      return;
+    } catch {
+      clearAuthToken();
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [setUser, setLoading]);
 
   useEffect(() => {
@@ -73,7 +52,7 @@ export function useAuth() {
   const login = useCallback(async (email: string, password: string) => {
     const result = await authService.login(email, password);
     setAuthToken(result.tokens.accessToken);
-    setRefreshToken(result.tokens.refreshToken);
+    
     setUser(result.user);
     connectSocket(result.tokens.accessToken);
     return result.user;
@@ -85,23 +64,17 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      await authService.logout(refreshToken).catch(() => {});
-    }
+    await authService.logout().catch(() => {});
     clearAuthToken();
-    setRefreshToken(null);
+    
     disconnectSocket();
     clearStore();
     navigate('/login');
   }, [clearStore, navigate]);
 
   const refreshToken = useCallback(async () => {
-    const rt = getRefreshToken();
-    if (!rt) throw new Error('No refresh token');
-    const tokens = await authService.refreshToken(rt);
+    const tokens = await authService.refreshToken();
     setAuthToken(tokens.accessToken);
-    setRefreshToken(tokens.refreshToken);
     return tokens;
   }, []);
 

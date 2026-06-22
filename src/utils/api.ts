@@ -26,22 +26,17 @@ export function getAuthToken(): string | null {
 
 async function refreshAccessToken(): Promise<boolean> {
   try {
-    const refreshToken = (() => {
-      try { return localStorage.getItem('devdale-refresh-token'); } catch { return null; }
-    })();
-    if (!refreshToken) return false;
-
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
 
     if (!res.ok) return false;
 
     const data = await res.json();
     setAuthToken(data.accessToken);
-    try { localStorage.setItem('devdale-refresh-token', data.refreshToken); } catch {}
+    
     return true;
   } catch {
     return false;
@@ -82,7 +77,6 @@ async function request<T>(
 
     clearAuthToken();
     try {
-      localStorage.removeItem('devdale-refresh-token');
       sessionStorage.removeItem('devdale-role');
       sessionStorage.removeItem('devdale-access-granted');
     } catch {}

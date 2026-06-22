@@ -202,6 +202,7 @@ export async function logoutAllSessions(userId: string): Promise<void> {
   );
   await Promise.all(blacklistOps);
   await Session.updateMany({ userId, isRevoked: false }, { isRevoked: true });
+  await User.findByIdAndUpdate(userId, { $inc: { tokenVersion: 1 } });
 }
 
 export async function getActiveSessions(userId: string) {

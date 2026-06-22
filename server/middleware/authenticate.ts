@@ -38,9 +38,13 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       return res.status(401).json({ error: 'Token has been revoked' });
     }
 
-    const user = await User.findById(payload.sub).select('_id role isActive');
+    const user = await User.findById(payload.sub).select('_id role isActive tokenVersion');
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User not found or inactive' });
+    }
+
+    if (payload.tokenVersion !== undefined && payload.tokenVersion !== user.tokenVersion) {
+      return res.status(401).json({ error: 'Token has been invalidated due to password change', code: 'TOKEN_VERSION_MISMATCH' });
     }
 
     req.user = { userId: user._id.toString(), role: user.role };

@@ -13,6 +13,7 @@ export const config = {
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES || '7d',
     issuer: process.env.JWT_ISSUER || 'devdale',
+    audience: process.env.JWT_AUDIENCE || 'devdale-portal',
   },
 
   email: {

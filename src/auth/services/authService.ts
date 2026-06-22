@@ -14,16 +14,16 @@ export const authService = {
       body: JSON.stringify({ name, username, email, password, role }),
     }),
 
-  refreshToken: (refreshToken: string) =>
-    api.request<{ accessToken: string; refreshToken: string }>('/auth/refresh', {
+  refreshToken: () =>
+    api.request<{ accessToken: string }>('/auth/refresh', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     }),
 
-  logout: (refreshToken: string) =>
+  logout: () =>
     api.request<{ message: string }>('/auth/logout', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     }).catch(() => ({ message: 'logged out' })),
 
   logoutAll: () =>
