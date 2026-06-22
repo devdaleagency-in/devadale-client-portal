@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Sliders, Moon, Sun, ChevronDown, User, Layers, FileText, X, Camera, Trash2 } from 'lucide-react';
+import { Sparkles, Sliders, Moon, Sun, ChevronDown, User, Layers, FileText, X, Camera, Trash2, Upload, MessageSquare, Calendar, Edit3 } from 'lucide-react';
 import type { User as AppUser, AppNotification } from '../types';
 import { initialsDataUri } from '../utils/avatar';
 import SearchBar from './SearchBar';
@@ -7,9 +7,9 @@ import NotificationBell from './notifications/NotificationBell';
 import NotificationDropdown from './notifications/NotificationDropdown';
 
 interface HeaderProps {
-  currentRole: 'admin' | 'client' | 'onboarding';
+  currentRole: 'admin' | 'client' | 'team_member' | 'onboarding';
   currentUser: AppUser | null;
-  setRole: (role: 'admin' | 'client' | 'onboarding') => void;
+  setRole: (role: 'admin' | 'client' | 'team_member' | 'onboarding') => void;
   currentTab?: string;
   onQuickAction: () => void;
   setCurrentTab?: (tab: string) => void;
@@ -30,6 +30,7 @@ interface HeaderProps {
   onDownloadNotification?: (id: string) => void;
   onNotificationAction?: (id: string, action: string) => void;
   onOpenNotificationCenter: () => void;
+  onQuickActionItem?: (action: string) => void;
 }
 
 export default function Header({
@@ -53,9 +54,11 @@ export default function Header({
   onDownloadNotification,
   onNotificationAction,
   onOpenNotificationCenter,
+  onQuickActionItem,
 }: HeaderProps) {
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showQuickAction, setShowQuickAction] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -105,7 +108,7 @@ export default function Header({
       {/* Action Tray */}
       <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-4">
         {/* Role Selector Trigger - Only visible for actual admin users */}
-        {currentUser?.role === 'admin' && (
+        {(currentUser?.role === 'admin' || currentUser?.role === 'super_admin') && (
           <div className="relative hidden sm:block">
             <button
               type="button"
@@ -184,14 +187,54 @@ export default function Header({
           </div>
         )}
 
-        {/* Quick Action Button */}
-        <button
-          onClick={onQuickAction}
-          className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs transition-colors shadow-sm hover:shadow"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-blue-100" />
-          <span className="hidden sm:inline">Quick Action</span>
-        </button>
+        {/* Quick Action Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowQuickAction(!showQuickAction)}
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs transition-colors shadow-sm hover:shadow"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-100" />
+            <span className="hidden sm:inline">Quick Action</span>
+          </button>
+          {showQuickAction && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowQuickAction(false)}
+              />
+              <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1 z-20 animate-in fade-in duration-100">
+                <button
+                  onClick={() => { setShowQuickAction(false); onQuickActionItem?.('upload'); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Upload Files</span>
+                </button>
+                <button
+                  onClick={() => { setShowQuickAction(false); onQuickActionItem?.('revision'); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Request Revision</span>
+                </button>
+                <button
+                  onClick={() => { setShowQuickAction(false); onQuickActionItem?.('meeting'); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Schedule Meeting</span>
+                </button>
+                <button
+                  onClick={() => { setShowQuickAction(false); onQuickActionItem?.('message'); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Send Message</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Theme Toggle Button */}
         <button

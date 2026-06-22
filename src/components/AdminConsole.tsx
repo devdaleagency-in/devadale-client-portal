@@ -27,11 +27,11 @@ import StatCard from './StatCard';
 import UpcomingDeadlines from './widgets/UpcomingDeadlines';
 import InvoiceStatus from './widgets/InvoiceStatus';
 import TeamActivityFeed from './widgets/TeamActivityFeed';
-import { INITIAL_DEADLINES, INITIAL_INVOICES, INITIAL_TEAM_ACTIVITY } from '../data';
 import LoadingSpinner from './ui/LoadingSpinner';
 import SkeletonCard from './ui/SkeletonCard';
 import EmptyState from './ui/EmptyState';
 import ErrorState from './ui/ErrorState';
+import { useDeadlines } from '../hooks/useDeadlines';
 
 interface AdminConsoleProps {
   projects: Project[];
@@ -66,11 +66,13 @@ export default function AdminConsole({
   onTriggerAction,
   setCurrentTab,
   onGenerateOnboardingLink,
+  currentUser,
 }: AdminConsoleProps) {
   const [selectedChartFilter, setSelectedChartFilter] = useState<
     'month' | 'quarter'
   >('month');
   const [showInsight, setShowInsight] = useState(true);
+  const { deadlines, loading: deadlinesLoading } = useDeadlines();
 
   if (loading) {
     return (
@@ -114,6 +116,7 @@ export default function AdminConsole({
 
   const activeCount = projects.filter((p) => p.id !== 'proj-focus').length;
   const newCount = projects.length - 4 > 0 ? projects.length - 4 : 2;
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   const chartData = {
     month: {
@@ -184,7 +187,9 @@ export default function AdminConsole({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full px-2">
-      {/* ─── Page Title ─── */}
+      {isAdmin && (
+        <>
+          {/* ─── Page Title ─── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">
@@ -499,6 +504,8 @@ export default function AdminConsole({
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* ─── Section: Active Projects ─── */}
       <SectionDivider icon={FolderKanban} title="Active Projects" />
@@ -615,8 +622,10 @@ export default function AdminConsole({
         </div>
       </div>
 
-      {/* ─── Section: Quick Actions ─── */}
-      <SectionDivider icon={Zap} title="Quick Actions" />
+      {isAdmin && (
+        <>
+          {/* ─── Section: Quick Actions ─── */}
+          <SectionDivider icon={Zap} title="Quick Actions" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:shadow-sm transition-shadow">
@@ -797,22 +806,24 @@ export default function AdminConsole({
           </div>
         </div>
       </div>
+        </>
+      )}
       {/* ─── Section: Team Collaboration ─── */}
       <SectionDivider icon={RefreshCw} title="Team Collaboration" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
         <div className="md:col-span-1 lg:col-span-5">
-          <UpcomingDeadlines deadlines={INITIAL_DEADLINES} />
+          <UpcomingDeadlines deadlines={deadlines} loading={deadlinesLoading} />
         </div>
         <div className="md:col-span-1 lg:col-span-4">
           <InvoiceStatus
-            invoices={INITIAL_INVOICES}
+            invoices={[]}
             onPay={(inv) => onTriggerAction(`Processing payment for ${inv.number}.`)}
             onDownload={(inv) => onTriggerAction(`Downloading invoice ${inv.number}.`)}
           />
         </div>
         <div className="md:col-span-1 lg:col-span-3">
-          <TeamActivityFeed activities={INITIAL_TEAM_ACTIVITY} maxItems={5} />
+          <TeamActivityFeed activities={[]} maxItems={5} />
         </div>
       </div>
     </div>

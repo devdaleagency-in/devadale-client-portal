@@ -1,11 +1,5 @@
 import SearchModal from './SearchModal';
 import type { Project, Agreement, ActivityFeed } from '../types';
-import {
-  INITIAL_INVOICES,
-  INITIAL_UPLOADS,
-  INITIAL_APPROVALS,
-  INITIAL_TEAM_ACTIVITY,
-} from '../data';
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -25,10 +19,11 @@ export default function GlobalSearch({ isOpen, onClose, projects, agreements, ac
       projects={projects}
       agreements={agreements}
       activity={activity}
-      invoices={INITIAL_INVOICES}
-      uploads={INITIAL_UPLOADS}
-      approvals={INITIAL_APPROVALS}
-      teamActivity={INITIAL_TEAM_ACTIVITY}
+      invoices={[]}
+      uploads={[]}
+      approvals={[]}
+      teamActivity={[]}
+      deadlines={[]}
       onNavigate={onNavigate}
       onTriggerAction={onTriggerAction}
     />

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Project,
   Agreement,
   Metrics,
   User,
+  AppNotification,
 } from '../types';
 import {
   CheckCircle,
@@ -16,11 +17,17 @@ import {
   Bell,
   LifeBuoy,
   MessageCircle,
-  Users,
-  ClipboardList,
   BarChart3,
+  CheckCheck,
+  Inbox,
+  Calendar,
+  Download,
+  Send,
+  Check,
+  X,
 } from 'lucide-react';
 import EmptyState from './ui/EmptyState';
+import SkeletonCard from './ui/SkeletonCard';
 import BrandingSettingsPage from './branding/BrandingSettingsPage';
 import Settings from './Settings';
 import Profile from './Profile';
@@ -28,6 +35,9 @@ import ProgressMeter from './ProgressMeter';
 import RealtimeChat from './chat/RealtimeChat';
 import AdminDeliverables from './AdminDeliverables';
 import ClientDeliverables from './ClientDeliverables';
+import NotificationItem from './notifications/NotificationItem';
+import CreateInvoiceModal from './CreateInvoiceModal';
+import { api } from '../utils/api';
 
 interface OtherTabViewsProps {
   currentTab: string;
@@ -43,6 +53,16 @@ interface OtherTabViewsProps {
   currentUser: User | null;
   onUpdateAvatar?: (file: File) => void;
   onRemoveAvatar?: () => void;
+  notifications?: AppNotification[];
+  notificationLoading?: boolean;
+  onMarkNotificationRead?: (id: string) => void;
+  onMarkAllNotificationsRead?: () => void;
+  onApproveNotification?: (id: string) => void;
+  onRejectNotification?: (id: string) => void;
+  onPreviewNotification?: (id: string) => void;
+  onDownloadNotification?: (id: string) => void;
+  onNotificationAction?: (id: string, action: string) => void;
+  unreadCount?: number;
 }
 
 export default function OtherTabViews({
@@ -59,136 +79,21 @@ export default function OtherTabViews({
   currentUser,
   onUpdateAvatar,
   onRemoveAvatar,
+  notifications: notificationsProp,
+  notificationLoading,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
+  onApproveNotification,
+  onRejectNotification,
+  onPreviewNotification,
+  onDownloadNotification,
+  onNotificationAction,
+  unreadCount: _unreadCount,
 }: OtherTabViewsProps) {
   const [signerName, setSignerName] = useState('Admin User');
   const [signerTitle, setSignerTitle] = useState('Director');
-  const pipelineStages = [
-    ['Discovery', 100, 'completed', 'Sep 15'],
-    ['Requirement Collection', 100, 'completed', 'Sep 22'],
-    ['Research & Planning', 100, 'completed', 'Oct 02'],
-    ['UI/UX Design', 72, 'active', 'Oct 27'],
-    ['Development', 28, 'active', 'Nov 05'],
-    ['Testing', 0, 'planned', 'Nov 12'],
-    ['Revisions', 0, 'planned', 'Nov 14'],
-    ['Deployment', 0, 'planned', 'Nov 18'],
-    ['Maintenance', 0, 'planned', 'Ongoing'],
-    ['Completed', 0, 'planned', 'Nov 20'],
-  ];
-  const taskColumns = [
-    { title: 'Completed', tone: 'emerald', tasks: ['Discovery workshop', 'Brand asset audit', 'Competitor teardown'] },
-    { title: 'Active', tone: 'blue', tasks: ['Homepage wireframes', 'Portal token system', 'Client feedback pass'] },
-    { title: 'Pending', tone: 'amber', tasks: ['Staging QA checklist', 'Final invoice generation', 'Launch email automation'] },
-  ];
-
-  if (currentTab === 'projects') {
-    return (
-      <div className="space-y-6 animate-in fade-in duration-300 px-2 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Project Workspace Directories</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Active, conceptualizing, and closed sprint systems.</p>
-          </div>
-          <button
-            type="button"
-            onClick={onNewProjectClick}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Deploy Project Pipeline</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.length === 0 ? (
-            <div className="md:col-span-2 lg:col-span-3">
-              <EmptyState
-                icon={FolderOpen}
-                title="No projects yet"
-                description="Active projects will appear here once they are created."
-              />
-            </div>
-          ) : (
-            projects.map((proj) => (
-              <div
-                key={proj.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-350 dark:hover:border-slate-700 hover:scale-[1.01] cursor-pointer transition-all h-[240px]"
-              >
-                <div>
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-full uppercase">
-                      {proj.stage}
-                    </span>
-                    <span className={`w-2.5 h-2.5 rounded-full ${proj.health === 'healthy'
-                        ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                        : proj.health === 'warning'
-                          ? 'bg-amber-500'
-                          : 'bg-rose-500 animate-pulse'
-                      }`} />
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-3">{proj.name}</h3>
-                  <p className="text-[10px] text-slate-450 dark:text-slate-500 mt-1">Lead Architect: {proj.team?.[0]?.name || 'Sarah Chen'}</p>
-                </div>
-
-                <div className="space-y-3.5">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-semibold text-slate-500">
-                      <span>Active Sprint Completion</span>
-                      <span className="font-mono">{proj.progress}%</span>
-                    </div>
-                    <ProgressMeter
-                      value={proj.progress}
-                      label={`${proj.name} sprint completion`}
-                      className="h-1"
-                    />
-                  </div>
-
-                  <div className="flex justify-between items-center text-[10px] bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded-lg border border-slate-100/30 dark:border-slate-850">
-                    <div>
-                      <span className="text-slate-400 block font-bold uppercase tracking-wider text-[8px]">Next Milestone</span>
-                      <span className="font-bold text-slate-700 dark:text-slate-300 block truncate max-w-[150px]">{proj.nextMilestone}</span>
-                    </div>
-                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{proj.nextMilestoneDate}</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {taskColumns.map((column) => (
-            <div key={column.title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-black text-slate-800 dark:text-slate-100">{column.title} Tasks</h3>
-                <span className="text-[10px] font-bold text-slate-400">{column.tasks.length} cards</span>
-              </div>
-              <div className="space-y-2">
-                {column.tasks.map((task, index) => (
-                  <button
-                    key={task}
-                    type="button"
-                    onClick={() => onTriggerAction(`${task} opened in ${column.title.toLowerCase()} board.`)}
-                    className="w-full text-left rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3 hover:border-blue-200 transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{task}</p>
-                      <span className="text-[9px] uppercase font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                        P{index + 1}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-3 text-[10px] text-slate-400 font-semibold">
-                      <Clock3 className="w-3.5 h-3.5" />
-                      Due {index === 0 ? 'today' : index === 1 ? 'Friday' : 'next week'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const pipelineStages: [string, number, string, string][] = [];
+  const taskColumns: { title: string; tone: string; tasks: string[] }[] = [];
 
   if (currentTab === 'timeline') {
     return (
@@ -199,8 +104,13 @@ export default function OtherTabViews({
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 overflow-x-auto">
-          <div className="min-w-[860px] grid grid-cols-10 gap-2">
-            {pipelineStages.map(([label, progress, status, date], index) => (
+          {pipelineStages.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-xs text-slate-400">
+              Pipeline stages will appear here once your project roadmap is defined.
+            </div>
+          ) : (
+            <div className="min-w-[860px] grid grid-cols-10 gap-2">
+              {pipelineStages.map(([label, progress, status, date], index) => (
               <button
                 key={label}
                 type="button"
@@ -229,21 +139,32 @@ export default function OtherTabViews({
               </button>
             ))}
           </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            ['Upcoming milestone', 'V1 prototype review', 'Oct 27', 'blue'],
-            ['Estimated delivery', 'Production handoff', 'Nov 20', 'emerald'],
-            ['Delay watch', 'API copy review pending', '2 day risk', 'amber'],
-          ].map(([title, value, meta, tone]) => (
-            <div key={title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{title}</p>
-              <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-2">{value}</h3>
-              <span className={`inline-flex mt-3 text-[10px] font-black rounded-full px-2 py-1 ${tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : tone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
-                }`}>{meta}</span>
+          {pipelineStages.length === 0 ? (
+            <div className="md:col-span-2 lg:col-span-3">
+              <EmptyState
+                icon={Calendar}
+                title="No milestones yet"
+                description="Milestones will appear here once your project roadmap is established."
+              />
             </div>
-          ))}
+          ) : (
+            [
+              ['Upcoming milestone', 'V1 prototype review', 'Oct 27', 'blue'],
+              ['Estimated delivery', 'Production handoff', 'Nov 20', 'emerald'],
+              ['Delay watch', 'API copy review pending', '2 day risk', 'amber'],
+            ].map(([title, value, meta, tone]) => (
+              <div key={title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{title}</p>
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mt-2">{value}</h3>
+                <span className={`inline-flex mt-3 text-[10px] font-black rounded-full px-2 py-1 ${tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' : tone === 'amber' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
+                  }`}>{meta}</span>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
@@ -292,11 +213,8 @@ export default function OtherTabViews({
             </span>
           </div>
 
-          <div className="space-y-3.5 max-h-48 overflow-y-auto bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-100/40 dark:border-slate-850 text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-mono">
-            <p className="font-bold text-slate-700 dark:text-slate-300">Section 1. Core Engagement Parameters_</p>
-            <p>DevDale agency shall design, formulate, and optimize digital deliverables for DevDale Agency conforming to sprint requirements. The project timeline triggers Oct 02 sprints.</p>
-            <p className="font-bold text-slate-700 dark:text-slate-300 mt-2">Section 2. Licensing & Deliverables_</p>
-            <p>Upon golden master handover, the intellectual property is transferred. Admin User (Director) coordinates feedback metrics loop weekly.</p>
+          <div className="space-y-3.5 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100/40 dark:border-slate-850 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p>Your Master Service Agreement is ready for review. Please read the terms carefully before signing.</p>
           </div>
 
           {msaStatus !== 'signed' ? (
@@ -342,7 +260,7 @@ export default function OtherTabViews({
               <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
               <div>
                 <span className="font-bold text-slate-800 dark:text-slate-200 block">Agreement Signed Off</span>
-                <span className="text-slate-500 dark:text-slate-400 text-[10px]">Digitally signed by {signerName} ({signerTitle}) • Oct 22 • Securely logged.</span>
+                <span className="text-slate-500 dark:text-slate-400 text-[10px]">Digitally signed by {signerName} ({signerTitle})</span>
               </div>
             </div>
           )}
@@ -376,35 +294,77 @@ export default function OtherTabViews({
   }
 
   if (currentTab === 'invoices') {
-    return (
-      <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-blue-600/10 rounded-xl">
-            <Receipt className="w-5 h-5 text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Invoices</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">View and manage your billing history</p>
-          </div>
-        </div>
-        <EmptyState icon={FolderOpen} title="No invoices yet" description="Invoices will appear here once billing is processed." />
-      </div>
-    );
+    if (currentRole === 'client') {
+      return <ClientInvoicesTab currentUser={currentUser} />;
+    }
+    return <AdminInvoicesTab currentUser={currentUser} onTriggerAction={onTriggerAction} />;
   }
 
   if (currentTab === 'notifications') {
+    const allNotifications = notificationsProp ?? [];
+    const unread = allNotifications.filter((n) => !n.read);
+    const read = allNotifications.filter((n) => n.read);
+    const sorted = [...unread, ...read];
+
     return (
       <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2.5 bg-amber-600/10 rounded-xl">
             <Bell className="w-5 h-5 text-amber-400" />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Notifications</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Stay updated with project activity and alerts</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {unread.length > 0
+                ? `${unread.length} unread · ${allNotifications.length} total`
+                : 'Stay updated with project activity and alerts'}
+            </p>
           </div>
+          {allNotifications.length > 0 && (
+            <button
+              onClick={onMarkAllNotificationsRead}
+              className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/40 rounded-lg transition-all"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Mark all read
+            </button>
+          )}
         </div>
-        <EmptyState icon={Bell} title="All caught up!" description="You have no unread notifications." />
+
+        {notificationLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i}>
+                <SkeletonCard lines={2} />
+              </div>
+            ))}
+          </div>
+        ) : allNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+              <Inbox className="w-7 h-7 text-slate-300 dark:text-slate-600" />
+            </div>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No notifications yet</p>
+            <p className="text-[11px] text-slate-400 mt-1 text-center max-w-xs">
+              Notifications from project updates, approvals, and team activity will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+            {sorted.map((n) => (
+              <NotificationItem
+                key={n.id}
+                notification={n}
+                onMarkRead={onMarkNotificationRead}
+                onApprove={onApproveNotification}
+                onReject={onRejectNotification}
+                onPreview={onPreviewNotification}
+                onDownload={onDownloadNotification}
+                onAction={onNotificationAction}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -422,40 +382,6 @@ export default function OtherTabViews({
           </div>
         </div>
         <EmptyState icon={MessageCircle} title="How can we help?" description="Submit a ticket or browse our knowledge base." />
-      </div>
-    );
-  }
-
-  if (currentTab === 'team') {
-    return (
-      <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-purple-600/10 rounded-xl">
-            <Users className="w-5 h-5 text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Team Access</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Manage team members and permissions</p>
-          </div>
-        </div>
-        <EmptyState icon={Users} title="No team members yet" description="Invite team members to collaborate on projects." />
-      </div>
-    );
-  }
-
-  if (currentTab === 'meetings') {
-    return (
-      <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-rose-600/10 rounded-xl">
-            <ClipboardList className="w-5 h-5 text-rose-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Meeting Notes</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Notes and summaries from your meetings</p>
-          </div>
-        </div>
-        <EmptyState icon={ClipboardList} title="No meeting notes yet" description="Meeting notes will appear here once recorded." />
       </div>
     );
   }
@@ -493,7 +419,7 @@ export default function OtherTabViews({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
             <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 mb-2">Database Reset</h3>
-            <p className="text-[11px] text-slate-400 mb-4">Reset all project, agreement, and activity data to the initial mock state.</p>
+            <p className="text-[11px] text-slate-400 mb-4">Reset all project, agreement, and activity data to the initial state.</p>
             <button
               onClick={() => {
                 if (window.confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
@@ -685,5 +611,299 @@ export default function OtherTabViews({
       onUpdateAvatar={onUpdateAvatar}
       onRemoveAvatar={onRemoveAvatar}
     />
+  );
+}
+
+function AdminInvoicesTab({
+  currentUser,
+  onTriggerAction,
+}: {
+  currentUser: User | null;
+  onTriggerAction: (msg: string) => void;
+}) {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [clientMap, setClientMap] = useState<Record<string, string>>({});
+
+  const fetchInvoices = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [res, clientsRes] = await Promise.all([
+        api.getInvoices(),
+        api.getClients().catch(() => ({ clients: [] })),
+      ]);
+      setInvoices(res.invoices || []);
+      const map: Record<string, string> = {};
+      for (const c of clientsRes.clients || []) {
+        map[c._id || c.id] = c.name;
+      }
+      setClientMap(map);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const handleStatusUpdate = async (id: string, status: string) => {
+    try {
+      await api.updateInvoice(id, { status });
+      onTriggerAction(`Invoice marked as ${status}`);
+      fetchInvoices();
+    } catch (err: any) {
+      onTriggerAction(`Error: ${err.message}`);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteInvoice(id);
+      onTriggerAction('Invoice cancelled');
+      fetchInvoices();
+    } catch (err: any) {
+      onTriggerAction(`Error: ${err.message}`);
+    }
+  };
+
+  const statusColor: Record<string, string> = {
+    draft: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
+    sent: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    viewed: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+    paid: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+    partially_paid: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    overdue: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+    cancelled: 'bg-slate-100 dark:bg-slate-800 text-slate-400',
+  };
+
+  return (
+    <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-600/10 rounded-xl">
+            <Receipt className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Invoices</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">View and manage billing history</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-bold text-xs transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create Invoice</span>
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40">
+          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+          <span className="text-xs font-semibold text-rose-600">{error}</span>
+        </div>
+      ) : invoices.length === 0 ? (
+        <EmptyState icon={FolderOpen} title="No invoices yet" description="Create your first invoice to get started." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800">
+                <th className="text-left py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Invoice</th>
+                <th className="text-left py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Client</th>
+                <th className="text-right py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Amount</th>
+                <th className="text-center py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="text-left py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Due Date</th>
+                <th className="text-right py-3 px-3 font-bold text-slate-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv: any) => (
+                <tr key={inv._id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
+                  <td className="py-3 px-3">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{inv.invoiceNumber}</span>
+                  </td>
+                  <td className="py-3 px-3 text-slate-500">{clientMap[inv.clientId] || (inv.clientId ? inv.clientId.slice(0, 8) : '-')}</td>
+                  <td className="py-3 px-3 text-right font-bold text-slate-800 dark:text-slate-200">
+                    {inv.currency} {inv.total?.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${statusColor[inv.status] || statusColor.draft}`}>
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-slate-500">
+                    {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {(inv.status === 'draft' || inv.status === 'sent') && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(inv._id, 'sent')}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg transition-colors"
+                          title="Mark as Sent"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {['sent', 'viewed'].includes(inv.status) && (
+                        <button
+                          type="button"
+                          onClick={() => handleStatusUpdate(inv._id, 'paid')}
+                          className="p-1.5 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg transition-colors"
+                          title="Mark as Paid"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {['draft', 'sent', 'viewed'].includes(inv.status) && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(inv._id)}
+                          className="p-1.5 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                          title="Cancel Invoice"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <CreateInvoiceModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={fetchInvoices}
+      />
+    </div>
+  );
+}
+
+function ClientInvoicesTab({
+  currentUser,
+}: {
+  currentUser: User | null;
+}) {
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchInvoices = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getInvoices();
+      setInvoices(res.invoices || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load invoices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const clientStatusColor: Record<string, string> = {
+    Preparing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    Received: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    'Under Review': 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+    Paid: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+    'Partially Paid': 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    Overdue: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+    Cancelled: 'bg-slate-100 dark:bg-slate-800 text-slate-400',
+  };
+
+  const toClientStatus = (status: string): string => {
+    const map: Record<string, string> = {
+      draft: 'Preparing',
+      sent: 'Received',
+      viewed: 'Under Review',
+      paid: 'Paid',
+      partially_paid: 'Partially Paid',
+      overdue: 'Overdue',
+      cancelled: 'Cancelled',
+    };
+    return map[status] || status;
+  };
+
+  return (
+    <div className="animate-in fade-in duration-300 px-2 max-w-5xl mx-auto w-full py-4 space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 bg-blue-600/10 rounded-xl">
+          <Receipt className="w-5 h-5 text-blue-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Invoices</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">View your billing history</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex items-center gap-2 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-800/40">
+          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+          <span className="text-xs font-semibold text-rose-600">{error}</span>
+        </div>
+      ) : invoices.length === 0 ? (
+        <EmptyState icon={FolderOpen} title="No invoices yet" description="Invoices will appear here once generated by your agency team." />
+      ) : (
+        <div className="space-y-3">
+          {invoices.map((inv: any) => {
+            const clientStatus = toClientStatus(inv.status);
+            return (
+              <div
+                key={inv._id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{inv.invoiceNumber}</span>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${clientStatusColor[clientStatus] || clientStatusColor.Preparing}`}>
+                      {clientStatus}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                    <span>Issued: {inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : '-'}</span>
+                    <span className="text-slate-300">•</span>
+                    <span>Due: {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-'}</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-base font-black text-slate-800 dark:text-slate-100">
+                    {inv.currency} {inv.total?.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import Header from '../components/Header';
@@ -9,29 +9,23 @@ import MobileSidebar from '../components/MobileSidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import ClientConsole from '../components/ClientConsole';
 import NewProjectModal from '../components/NewProjectModal';
+import UploadFilesModal from '../components/UploadFilesModal';
+import RevisionRequestModal from '../components/RevisionRequestModal';
+import MeetingSchedulerModal from '../components/MeetingSchedulerModal';
 import SupportChatDrawer from '../components/SupportChatDrawer';
 import OtherTabViews from '../components/OtherTabViews';
+import { api } from '../utils/api';
 import { Project, Agreement, ActivityFeed, User, AppNotification } from '../types';
 
 interface ClientPortalProps {
   currentRole: 'admin' | 'client' | 'onboarding';
   setRole: (role: 'admin' | 'client' | 'onboarding') => void;
-  projects: Project[];
-  agreements: Agreement[];
-  activity: ActivityFeed[];
-  metrics: any;
-  msaStatus: 'signed' | 'pending' | 'draft';
   currentUser: User | null;
   notifications: AppNotification[];
   setNotifications: Dispatch<SetStateAction<AppNotification[]>>;
   toast: { id: string; msg: string; type: 'success' | 'info' | 'critical' } | null;
   setToast: Dispatch<SetStateAction<{ id: string; msg: string; type: 'success' | 'info' | 'critical' } | null>>;
-  dataError: string | null;
   isLoading: boolean;
-  handleSetCurrentTab: (tab: string) => void;
-  handleAddNewProject: (proj: Omit<Project, 'id'>) => Promise<void>;
-  handleSignAgreement: () => Promise<void>;
-  handleResetData: () => Promise<void>;
   handleSignOut: () => void;
   handleUpdateAvatar: (file: File) => Promise<void>;
   handleRemoveAvatar: () => Promise<void>;
@@ -43,11 +37,11 @@ interface ClientPortalProps {
   handleDownloadNotification: (id: string) => void;
   handleNotificationAction: (id: string, action: string) => void;
   triggerToast: (msg: string, type?: 'success' | 'info' | 'critical') => void;
+  fetchNotifications: () => Promise<void>;
 }
 
 const clientTabFromPath: Record<string, string> = {
   '/dashboard': 'dashboard',
-  '/projects': 'projects',
   '/timeline': 'timeline',
   '/messages': 'messages',
   '/agreements': 'agreements',
@@ -55,24 +49,19 @@ const clientTabFromPath: Record<string, string> = {
   '/invoices': 'invoices',
   '/notifications': 'notifications',
   '/support': 'support',
-  '/team': 'team',
-  '/meetings': 'meetings',
   '/profile': 'profile',
 };
 
 export default function ClientPortal({
   currentRole, setRole,
-  projects, agreements, activity, metrics, msaStatus,
   currentUser, notifications, setNotifications,
-  toast, setToast, dataError, isLoading,
-  handleSetCurrentTab,
-  handleAddNewProject, handleSignAgreement,
-  handleResetData, handleSignOut,
-  handleUpdateAvatar, handleRemoveAvatar,
+  toast, setToast, isLoading,
+  handleSignOut, handleUpdateAvatar, handleRemoveAvatar,
   handleMarkNotificationRead, handleMarkAllNotificationsRead,
   handleApproveNotification, handleRejectNotification,
   handlePreviewNotification, handleDownloadNotification,
   handleNotificationAction, triggerToast,
+  fetchNotifications,
 }: ClientPortalProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -83,6 +72,47 @@ export default function ClientPortal({
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+
+  // Client-specific data state (isolated from admin)
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
+  const [activity, setActivity] = useState<ActivityFeed[]>([]);
+  const [metrics, setMetrics] = useState<any>({ activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 });
+  const [msaStatus, setMsaStatus] = useState<'signed' | 'pending' | 'draft'>('pending');
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const fetchAllData = useCallback(async () => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      const [projs, agrees, acts, metrs, msa] = await Promise.all([
+        api.getProjects(),
+        api.getAgreements(),
+        api.getActivity(),
+        api.getMetrics(),
+        api.getMsaStatus(),
+      ]);
+      setProjects(projs);
+      setAgreements(agrees);
+      setActivity(acts);
+      setMetrics(metrs);
+      setMsaStatus(msa.msaStatus as 'signed' | 'pending' | 'draft');
+    } catch (err) {
+      console.error('Failed to fetch client data:', err);
+      setDataError('Unable to load dashboard data. Please check your connection and try again.');
+    } finally {
+      setDataLoading(false);
+    }
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   useEffect(() => {
     const tab = clientTabFromPath[location.pathname];
@@ -132,6 +162,7 @@ export default function ClientPortal({
           handleTabChange(tab);
           setIsMobileSidebarOpen(false);
         }}
+        unreadCount={notifications.filter((n) => !n.read).length}
       />
 
       <MobileSidebar
@@ -150,7 +181,7 @@ export default function ClientPortal({
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
       />
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen md:ml-64">
         <Header
           currentTab={currentTab}
           onOpenSearch={() => setIsSearchOpen(true)}
@@ -171,23 +202,45 @@ export default function ClientPortal({
           onDownloadNotification={handleDownloadNotification}
           onNotificationAction={handleNotificationAction}
           onOpenNotificationCenter={() => setIsNotificationCenterOpen(true)}
+          onQuickActionItem={(action) => {
+            switch (action) {
+              case 'upload':
+                setShowUploadModal(true);
+                break;
+              case 'revision':
+                setShowRevisionModal(true);
+                break;
+              case 'meeting':
+                setShowMeetingModal(true);
+                break;
+              case 'message':
+                handleTabChange('messages');
+                break;
+            }
+          }}
         />
 
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto pb-20 md:pb-6">
           {currentTab === 'dashboard' && (
             <ClientConsole
-              loading={isLoading}
+              loading={dataLoading || isLoading}
               error={dataError}
               projects={projects}
               activity={activity}
               agreements={agreements}
               msaStatus={msaStatus}
-              onSignAgreement={handleSignAgreement}
+              onSignAgreement={() => {}}
               onTriggerAction={(msg) => triggerToast(msg, 'info')}
               onNewProjectClick={() => setIsNewProjectModalOpen(true)}
               currentUser={currentUser}
               onUpdateAvatar={handleUpdateAvatar}
               onRemoveAvatar={handleRemoveAvatar}
+              onOpenMessages={() => handleTabChange('messages')}
+              onViewRoadmap={() => handleTabChange('timeline')}
+              onOpenSupportchat={() => setIsSupportOpen(true)}
+              onOpenUploadModal={() => setShowUploadModal(true)}
+              onOpenRevisionModal={() => setShowRevisionModal(true)}
+              onOpenMeetingModal={() => setShowMeetingModal(true)}
             />
           )}
 
@@ -197,14 +250,23 @@ export default function ClientPortal({
             projects={projects}
             agreements={agreements}
             msaStatus={msaStatus}
-            onSignAgreement={handleSignAgreement}
+            onSignAgreement={() => {}}
             onNewProjectClick={() => setIsNewProjectModalOpen(true)}
             onTriggerAction={(msg) => triggerToast(msg, 'info')}
             metrics={metrics}
-            onResetData={handleResetData}
+            onResetData={async () => {}}
             currentUser={currentUser}
             onUpdateAvatar={handleUpdateAvatar}
             onRemoveAvatar={handleRemoveAvatar}
+            notifications={notifications}
+            unreadCount={notifications.filter((n) => !n.read).length}
+            onMarkNotificationRead={handleMarkNotificationRead}
+            onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+            onApproveNotification={handleApproveNotification}
+            onRejectNotification={handleRejectNotification}
+            onPreviewNotification={handlePreviewNotification}
+            onDownloadNotification={handleDownloadNotification}
+            onNotificationAction={handleNotificationAction}
           />
         </main>
       </div>
@@ -227,7 +289,7 @@ export default function ClientPortal({
       {isNewProjectModalOpen && (
         <NewProjectModal
           onClose={() => setIsNewProjectModalOpen(false)}
-          onSubmit={handleAddNewProject}
+          onSubmit={async () => {}}
         />
       )}
 
@@ -252,6 +314,23 @@ export default function ClientPortal({
         onPreview={handlePreviewNotification}
         onDownload={handleDownloadNotification}
         onAction={handleNotificationAction}
+      />
+
+      <UploadFilesModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUploadComplete={(files) => {
+          triggerToast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded successfully`, 'success');
+        }}
+      />
+      <RevisionRequestModal
+        isOpen={showRevisionModal}
+        onClose={() => setShowRevisionModal(false)}
+        projects={projects}
+      />
+      <MeetingSchedulerModal
+        isOpen={showMeetingModal}
+        onClose={() => setShowMeetingModal(false)}
       />
     </div>
   );

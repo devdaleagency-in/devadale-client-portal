@@ -1,4 +1,4 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import Header from '../components/Header';
@@ -9,31 +9,24 @@ import MobileSidebar from '../components/MobileSidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import AdminConsole from '../components/AdminConsole';
 import NewProjectModal from '../components/NewProjectModal';
+import UploadFilesModal from '../components/UploadFilesModal';
+import RevisionRequestModal from '../components/RevisionRequestModal';
+import MeetingSchedulerModal from '../components/MeetingSchedulerModal';
 import CreateOnboardingLinkModal from '../components/CreateOnboardingLinkModal';
 import SupportChatDrawer from '../components/SupportChatDrawer';
 import OtherTabViews from '../components/OtherTabViews';
+import { api } from '../utils/api';
 import { Project, Agreement, Metrics, ActivityFeed, OnboardingLinkRequest, OnboardingLinkResponse, User, AppNotification } from '../types';
 
 interface AdminPortalProps {
-  currentRole: 'admin' | 'client' | 'onboarding';
-  setRole: (role: 'admin' | 'client' | 'onboarding') => void;
-  projects: Project[];
-  agreements: Agreement[];
-  activity: ActivityFeed[];
-  metrics: Metrics;
-  msaStatus: 'signed' | 'pending' | 'draft';
+  currentRole: 'admin' | 'client' | 'team_member' | 'onboarding';
+  setRole: (role: 'admin' | 'client' | 'team_member' | 'onboarding') => void;
   currentUser: User | null;
   notifications: AppNotification[];
   setNotifications: Dispatch<SetStateAction<AppNotification[]>>;
   toast: { id: string; msg: string; type: 'success' | 'info' | 'critical' } | null;
   setToast: Dispatch<SetStateAction<{ id: string; msg: string; type: 'success' | 'info' | 'critical' } | null>>;
-  dataError: string | null;
   isLoading: boolean;
-  handleSetCurrentTab: (tab: string) => void;
-  handleAddNewProject: (proj: Omit<Project, 'id'>) => Promise<void>;
-  handleSignAgreement: () => Promise<void>;
-  handleGenerateAgreement: () => Promise<void>;
-  handleResetData: () => Promise<void>;
   handleSignOut: () => void;
   handleUpdateAvatar: (file: File) => Promise<void>;
   handleRemoveAvatar: () => Promise<void>;
@@ -46,6 +39,7 @@ interface AdminPortalProps {
   handleDownloadNotification: (id: string) => void;
   handleNotificationAction: (id: string, action: string) => void;
   triggerToast: (msg: string, type?: 'success' | 'info' | 'critical') => void;
+  fetchNotifications: () => Promise<void>;
 }
 
 const adminTabFromPath: Record<string, string> = {
@@ -56,24 +50,22 @@ const adminTabFromPath: Record<string, string> = {
   '/admin/clients': 'clients',
   '/admin/analytics': 'analytics',
   '/admin/billing': 'billing',
+  '/admin/invoices': 'invoices',
   '/admin/integrations': 'integrations',
   '/admin/deliverables': 'deliverables',
 };
 
 export default function AdminPortal({
   currentRole, setRole,
-  projects, agreements, activity, metrics, msaStatus,
   currentUser, notifications, setNotifications,
-  toast, setToast, dataError, isLoading,
-  handleSetCurrentTab,
-  handleAddNewProject, handleSignAgreement, handleGenerateAgreement,
-  handleResetData, handleSignOut,
-  handleUpdateAvatar, handleRemoveAvatar,
+  toast, setToast, isLoading,
+  handleSignOut, handleUpdateAvatar, handleRemoveAvatar,
   handleCreateOnboardingLink,
   handleMarkNotificationRead, handleMarkAllNotificationsRead,
   handleApproveNotification, handleRejectNotification,
   handlePreviewNotification, handleDownloadNotification,
   handleNotificationAction, triggerToast,
+  fetchNotifications,
 }: AdminPortalProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,6 +77,47 @@ export default function AdminPortal({
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isCreateLinkModalOpen, setIsCreateLinkModalOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+
+  // Admin-specific data state (isolated from client)
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
+  const [activity, setActivity] = useState<ActivityFeed[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>({ activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 });
+  const [msaStatus, setMsaStatus] = useState<'signed' | 'pending' | 'draft'>('pending');
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const fetchAllData = useCallback(async () => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      const [projs, agrees, acts, metrs, msa] = await Promise.all([
+        api.getProjects(),
+        api.getAgreements(),
+        api.getActivity(),
+        api.getMetrics(),
+        api.getMsaStatus(),
+      ]);
+      setProjects(projs);
+      setAgreements(agrees);
+      setActivity(acts);
+      setMetrics(metrs);
+      setMsaStatus(msa.msaStatus as 'signed' | 'pending' | 'draft');
+    } catch (err) {
+      console.error('Failed to fetch admin data:', err);
+      setDataError('Unable to load dashboard data. Please check your connection and try again.');
+    } finally {
+      setDataLoading(false);
+    }
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   useEffect(() => {
     const tab = adminTabFromPath[location.pathname];
@@ -98,6 +131,67 @@ export default function AdminPortal({
     const path = tab === 'dashboard' ? '/admin' : `/admin/${tab}`;
     if (location.pathname !== path) {
       navigate(path, { replace: true });
+    }
+  };
+
+  const handleAddNewProject = async (newProj: Omit<Project, 'id'>) => {
+    try {
+      const created = await api.addProject(newProj);
+      setProjects(prev => [created, ...prev]);
+      setMetrics(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
+      setActivity(prev => [{
+        id: `act-${Date.now()}`,
+        message: `Allocated new project pipeline: ${newProj.name}`,
+        timestamp: 'Just now',
+        actor: 'Admin Console',
+        type: 'approval',
+      }, ...prev]);
+      triggerToast(`Successfully deployed ${newProj.name} to active production sprints!`, 'success');
+    } catch {
+      triggerToast('Failed to create project.', 'critical');
+    }
+  };
+
+  const handleSignAgreement = async () => {
+    try {
+      const result = await api.signAgreement();
+      setMsaStatus('signed');
+      setAgreements(result.agreements);
+      setMetrics(result.metrics);
+      setActivity(prev => [...result.activity, ...prev]);
+      triggerToast("MSA authorized and digitally signed successfully!", 'success');
+    } catch {
+      triggerToast('Failed to sign agreement.', 'critical');
+    }
+  };
+
+  const handleGenerateAgreement = async () => {
+    const newAgree = {
+      name: 'MSA - SwiftShop E-com Launch',
+      client: 'SwiftShop E-com',
+      status: 'pending',
+    };
+    try {
+      const created = await api.addAgreement(newAgree);
+      setAgreements(prev => [created, ...prev]);
+      setMetrics(prev => ({ ...prev, pendingApprovals: prev.pendingApprovals + 1 }));
+      triggerToast("Generated legal MSA draft template for SwiftShop E-com.", "info");
+    } catch {
+      triggerToast('Failed to generate agreement.', 'critical');
+    }
+  };
+
+  const handleResetData = async () => {
+    try {
+      const result = await api.reset();
+      setProjects(result.db.projects);
+      setAgreements(result.db.agreements);
+      setActivity(result.db.activity);
+      setMetrics(result.db.metrics);
+      setMsaStatus('pending');
+      triggerToast("Database reset successfully.");
+    } catch {
+      triggerToast('Failed to reset data.', 'critical');
     }
   };
 
@@ -127,6 +221,7 @@ export default function AdminPortal({
       )}
 
       <AdminSidebar
+        currentRole={currentRole}
         currentTab={currentTab}
         setCurrentTab={(tab) => {
           handleTabChange(tab);
@@ -151,7 +246,7 @@ export default function AdminPortal({
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
       />
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen md:ml-64">
         <Header
           currentTab={currentTab}
           onOpenSearch={() => setIsSearchOpen(true)}
@@ -172,12 +267,28 @@ export default function AdminPortal({
           onDownloadNotification={handleDownloadNotification}
           onNotificationAction={handleNotificationAction}
           onOpenNotificationCenter={() => setIsNotificationCenterOpen(true)}
+          onQuickActionItem={(action) => {
+            switch (action) {
+              case 'upload':
+                setShowUploadModal(true);
+                break;
+              case 'revision':
+                setShowRevisionModal(true);
+                break;
+              case 'meeting':
+                setShowMeetingModal(true);
+                break;
+              case 'message':
+                triggerToast('Opening messages...', 'info');
+                break;
+            }
+          }}
         />
 
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto pb-20 md:pb-6">
           {currentTab === 'dashboard' && (
             <AdminConsole
-              loading={isLoading}
+              loading={dataLoading}
               error={dataError}
               projects={projects}
               agreements={agreements}
@@ -211,6 +322,15 @@ export default function AdminPortal({
             currentUser={currentUser}
             onUpdateAvatar={handleUpdateAvatar}
             onRemoveAvatar={handleRemoveAvatar}
+            notifications={notifications}
+            unreadCount={notifications.filter((n) => !n.read).length}
+            onMarkNotificationRead={handleMarkNotificationRead}
+            onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+            onApproveNotification={handleApproveNotification}
+            onRejectNotification={handleRejectNotification}
+            onPreviewNotification={handlePreviewNotification}
+            onDownloadNotification={handleDownloadNotification}
+            onNotificationAction={handleNotificationAction}
           />
         </main>
       </div>
@@ -265,6 +385,23 @@ export default function AdminPortal({
         onPreview={handlePreviewNotification}
         onDownload={handleDownloadNotification}
         onAction={handleNotificationAction}
+      />
+
+      <UploadFilesModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUploadComplete={(files) => {
+          triggerToast(`${files.length} file${files.length > 1 ? 's' : ''} uploaded successfully`, 'success');
+        }}
+      />
+      <RevisionRequestModal
+        isOpen={showRevisionModal}
+        onClose={() => setShowRevisionModal(false)}
+        projects={projects}
+      />
+      <MeetingSchedulerModal
+        isOpen={showMeetingModal}
+        onClose={() => setShowMeetingModal(false)}
       />
     </div>
   );

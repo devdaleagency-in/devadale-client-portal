@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const ProjectSchema = new mongoose.Schema(
   {
+    _id: { type: String, required: true },
     name: {
       type: String,
       required: true,
@@ -10,6 +11,14 @@ const ProjectSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    clientId: {
+      type: String,
+      ref: 'User',
+    },
+    assignedMembers: [{
+      type: String,
+      ref: 'User',
+    }],
     stage: {
       type: String,
       default: "Discovery",
@@ -55,6 +64,7 @@ const ProjectSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    _id: false,
   }
 );
 

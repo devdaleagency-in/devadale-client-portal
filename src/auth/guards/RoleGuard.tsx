@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 interface RoleGuardProps {
   children: ReactNode;
-  allowedRoles: ('admin' | 'client' | 'onboarding')[];
+  allowedRoles: ('super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding')[];
   fallback?: ReactNode;
 }
 

@@ -7,13 +7,15 @@ declare global {
     interface Request {
       user?: {
         userId: string;
-        role: 'admin' | 'client' | 'onboarding';
+        role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
       };
     }
   }
 }
 
-export async function authenticate(req: Request, res: Response, next: NextFunction) {
+export const authenticate = authenticateUser;
+
+export async function authenticateUser(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required' });

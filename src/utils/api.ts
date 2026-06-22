@@ -63,7 +63,7 @@ async function request<T>(
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
-  if (res.status === 401 && !path.includes('/auth/refresh')) {
+  if (res.status === 401 && !path.includes('/auth/refresh') && !path.includes('/auth/login')) {
     if (!refreshPromise) {
       refreshPromise = refreshAccessToken().finally(() => {
         refreshPromise = null;
@@ -232,5 +232,66 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
+  getNotifications: () => request<any[]>('/notifications'),
+
+  getUnreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+
+  markNotificationRead: (id: string) =>
+    request<any>(`/notifications/${id}/read`, { method: 'POST' }),
+
+  markAllNotificationsRead: () =>
+    request<any>('/notifications/read-all', { method: 'POST' }),
+
+  sendNotification: (data: { userId: string; type: string; title: string; body: string; data?: Record<string, any> }) =>
+    request<any>('/notifications/send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   reset: () => request<{ message: string; db: any }>('/reset', { method: 'POST' }),
+
+  createRevision: (data: { projectId: string; title: string; description?: string; priority?: string }) =>
+    request<any>('/revisions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createMeeting: (data: { projectId?: string; title: string; date: string; time: string; meetingType?: string; notes?: string }) =>
+    request<any>('/meetings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getInvoices: (params?: { clientId?: string; status?: string; page?: string; limit?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return request<any>(`/invoices${query}`);
+  },
+
+  createInvoice: (data: {
+    clientId: string;
+    projectId?: string;
+    amount: number;
+    tax?: number;
+    total: number;
+    currency?: string;
+    dueDate: string;
+    notes?: string;
+  }) =>
+    request<any>('/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateInvoice: (id: string, data: { status?: string; notes?: string; dueDate?: string }) =>
+    request<any>(`/invoices/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteInvoice: (id: string) =>
+    request<any>(`/invoices/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getClients: () => request<{ clients: any[]; total: number; page: number; totalPages: number }>('/admin/clients'),
 };

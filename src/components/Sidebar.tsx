@@ -23,11 +23,13 @@ import {
 import BrandLogo from './BrandLogo';
 import RippleButton from './RippleButton';
 
+import { clientSidebarConfig } from '../config/sidebarConfig';
+
 interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  currentRole: 'admin' | 'client' | 'onboarding';
-  setRole: (role: 'admin' | 'client' | 'onboarding') => void;
+  currentRole: 'admin' | 'client' | 'team_member' | 'onboarding';
+  setRole: (role: 'admin' | 'client' | 'team_member' | 'onboarding') => void;
   onNewProjectClick: () => void;
 }
 
@@ -46,35 +48,39 @@ export default function Sidebar({
   setRole,
   onNewProjectClick
 }: SidebarProps) {
-  const mainTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'projects', label: 'Projects', icon: Briefcase },
-    { id: 'timeline', label: 'Roadmap', icon: Calendar },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'agreements', label: 'Agreements', icon: ScrollText },
-    { id: 'deliverables', label: 'Deliverables', icon: FileCheck },
-  ];
-
-  const workspaceTabs = [
-    { id: 'invoices', label: 'Invoices', icon: Receipt },
-    { id: 'notifications', label: 'Notifications', icon: Bell, badge: 3 },
-    { id: 'support', label: 'Support Center', icon: LifeBuoy },
-  ];
-
-  const collaborationTabs = [
-    { id: 'team', label: 'Team Access', icon: Users },
-    { id: 'meetings', label: 'Meeting Notes', icon: ClipboardList },
-  ];
-
-  const adminTabs = [
-    { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'branding', label: 'Portal Config', icon: Palette },
-  ];
-
   const handleTabClick = (tabId: string) => {
     setCurrentTab(tabId);
   };
+
+  const renderTab = (tab: { id: string; label: string; icon: any; badge?: number }) => {
+    const IconComponent = tab.icon;
+    const isActive = currentTab === tab.id;
+
+    return (
+      <RippleButton
+        key={tab.id}
+        onClick={() => handleTabClick(tab.id)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide cursor-pointer transition-all duration-200 hover:bg-slate-800/80 active:scale-[0.98] touch-manipulation ${
+          isActive
+            ? 'bg-blue-600/10 text-blue-400 border-l-[3px] border-blue-400 pl-[9px]'
+            : 'text-slate-400 hover:text-slate-200'
+        }`}
+      >
+        <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
+        <span className="flex-1">{tab.label}</span>
+        {tab.badge ? (
+          <span className="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-rose-500 text-white min-w-[18px] text-center leading-tight">
+            {tab.badge}
+          </span>
+        ) : null}
+      </RippleButton>
+    );
+  };
+
+  const filteredConfig = clientSidebarConfig.map(section => ({
+    ...section,
+    items: section.items.filter(item => item.allowedRoles.includes(currentRole))
+  })).filter(section => section.items.length > 0);
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen fixed left-0 top-0 z-40 transition-colors">
@@ -86,163 +92,26 @@ export default function Sidebar({
 
       {/* Primary Navigation Menu */}
       <nav className="flex-1 overflow-y-auto space-y-0.5 px-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-        {/* Main Section */}
-        {mainTabs.map((tab) => {
-          const IconComponent = tab.icon;
-          const isActive = currentTab === tab.id;
-
-          return (
-            <RippleButton
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide cursor-pointer transition-all duration-200 hover:bg-slate-800/80 active:scale-[0.98] touch-manipulation ${
-                isActive
-                  ? 'bg-blue-600/10 text-blue-400 border-l-[3px] border-blue-400 pl-[9px]'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
-              <span>{tab.label}</span>
-            </RippleButton>
-          );
-        })}
-
-        {/* Divider - Workspace */}
-        <div className="pt-4 pb-1">
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex-1 h-px bg-slate-800/60" />
-            <span className="text-[9px] font-bold tracking-widest text-slate-600 uppercase">Workspace</span>
-            <div className="flex-1 h-px bg-slate-800/60" />
-          </div>
-        </div>
-
-        {/* Workspace Section */}
-        {workspaceTabs.map((tab) => {
-          const IconComponent = tab.icon;
-          const isActive = currentTab === tab.id;
-
-          return (
-            <RippleButton
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide cursor-pointer transition-all duration-200 hover:bg-slate-800/80 active:scale-[0.98] touch-manipulation ${
-                isActive
-                  ? 'bg-blue-600/10 text-blue-400 border-l-[3px] border-blue-400 pl-[9px]'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
-              <span className="flex-1">{tab.label}</span>
-              {(tab as any).badge ? (
-                <span className="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-rose-500 text-white min-w-[18px] text-center leading-tight">
-                  {(tab as any).badge}
-                </span>
-              ) : null}
-            </RippleButton>
-          );
-        })}
-
-        {/* Divider - Collaboration */}
-        <div className="pt-4 pb-1">
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex-1 h-px bg-slate-800/60" />
-            <span className="text-[9px] font-bold tracking-widest text-slate-600 uppercase">Collaboration</span>
-            <div className="flex-1 h-px bg-slate-800/60" />
-          </div>
-        </div>
-
-        {/* Collaboration Section */}
-        {collaborationTabs.map((tab) => {
-          const IconComponent = tab.icon;
-          const isActive = currentTab === tab.id;
-
-          return (
-            <RippleButton
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide cursor-pointer transition-all duration-200 hover:bg-slate-800/80 active:scale-[0.98] touch-manipulation ${
-                isActive
-                  ? 'bg-blue-600/10 text-blue-400 border-l-[3px] border-blue-400 pl-[9px]'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
-              <span>{tab.label}</span>
-            </RippleButton>
-          );
-        })}
-
-        {/* Management Section - only for non-client */}
-        {currentRole !== 'client' && (
-          <>
-            <div className="pt-4 pb-1">
-              <div className="flex items-center gap-2 px-3">
-                <div className="flex-1 h-px bg-slate-800/60" />
-                <span className="text-[9px] font-bold tracking-widest text-slate-600 uppercase">Management</span>
-                <div className="flex-1 h-px bg-slate-800/60" />
+        {filteredConfig.map((section, idx) => (
+          <div key={idx}>
+            {section.title && (
+              <div className="pt-4 pb-1">
+                <div className="flex items-center gap-2 px-3">
+                  <div className="flex-1 h-px bg-slate-800/60" />
+                  <span className="text-[9px] font-bold tracking-widest text-slate-600 uppercase">{section.title}</span>
+                  <div className="flex-1 h-px bg-slate-800/60" />
+                </div>
               </div>
-            </div>
-
-            {adminTabs.map((tab) => {
-              const IconComponent = tab.icon;
-              const isActive = currentTab === tab.id;
-
-              return (
-                <RippleButton
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide cursor-pointer transition-all duration-200 hover:bg-slate-800/80 active:scale-[0.98] touch-manipulation ${
-                    isActive
-                      ? 'bg-blue-600/10 text-blue-400 border-l-[3px] border-blue-400 pl-[9px]'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span>{tab.label}</span>
-                </RippleButton>
-              );
-            })}
-          </>
-        )}
+            )}
+            {section.items.map(renderTab)}
+          </div>
+        ))}
       </nav>
 
       {/* Bottom Widgets Section */}
       <div className="border-t border-slate-800/50 space-y-2.5 px-3 py-3 overflow-y-auto shrink-0 max-h-[520px]">
 
-        {/* 1. Workspace Storage Usage */}
-        <div className="group bg-slate-800/40 hover:bg-slate-800/60 rounded-xl p-3 transition-colors">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Storage</span>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500">78 / 100 GB</span>
-          </div>
-          <div className="h-1.5 bg-slate-700/60 rounded-full overflow-hidden">
-            <div className="h-full w-[78%] bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-500 group-hover:brightness-110" />
-          </div>
-          <div className="flex justify-end mt-1">
-            <span className="text-[9px] font-mono text-slate-500">78% used</span>
-          </div>
-        </div>
 
-        {/* 2. Current Subscription Plan */}
-        <div className="group bg-slate-800/40 hover:bg-slate-800/60 rounded-xl p-3 transition-colors">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan</span>
-            </div>
-            <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Pro
-            </span>
-          </div>
-          <button className="mt-2 w-full py-1.5 bg-slate-700/60 hover:bg-slate-600/80 text-slate-300 hover:text-white text-[10px] font-semibold rounded-lg transition-all flex items-center justify-center gap-1 group/upgrade">
-            <span>Upgrade Plan</span>
-            <ChevronRight className="w-3 h-3 group-hover/upgrade:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
 
         {/* 3. Team Members Online */}
         <div className="group bg-slate-800/40 hover:bg-slate-800/60 rounded-xl p-3 transition-colors">

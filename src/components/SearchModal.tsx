@@ -21,8 +21,7 @@ import {
 } from 'lucide-react';
 import type { SearchResultItem } from '../utils/search';
 import { searchAll, getFilterOptions, getRecentSearches, addRecentSearch } from '../utils/search';
-import type { Project, Agreement, ActivityFeed, Invoice, UploadedFile, ApprovalItem, TeamActivity } from '../types';
-import { INITIAL_DEADLINES } from '../data';
+import type { Project, Agreement, ActivityFeed, Invoice, UploadedFile, ApprovalItem, TeamActivity, Deadline } from '../types';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -34,6 +33,7 @@ interface SearchModalProps {
   uploads: UploadedFile[];
   approvals: ApprovalItem[];
   teamActivity: TeamActivity[];
+  deadlines?: Deadline[];
   onNavigate: (tab: string) => void;
   onTriggerAction: (msg: string) => void;
 }
@@ -318,7 +318,7 @@ function PopularSuggestions({ projects, onNavigate }: { projects: Project[]; onN
         {popular.map((p) => (
           <button
             key={p.id}
-            onClick={() => onNavigate('projects')}
+            onClick={() => onNavigate('dashboard')}
             className="px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-all flex items-center gap-1"
           >
             <FolderKanban className="w-2.5 h-2.5 text-blue-500" />
@@ -340,6 +340,7 @@ export default function SearchModal({
   uploads,
   approvals,
   teamActivity,
+  deadlines = [],
   onNavigate,
   onTriggerAction,
 }: SearchModalProps) {
@@ -369,7 +370,7 @@ export default function SearchModal({
     setIsLoading(true);
     const timer = setTimeout(() => {
       const results = searchAll(
-        query, projects, agreements, activity, invoices, uploads, approvals, teamActivity, INITIAL_DEADLINES,
+        query, projects, agreements, activity, invoices, uploads, approvals, teamActivity, deadlines,
         { category: activeCategory },
       );
       const grouped: Record<string, SearchResultItem[]> = {};
@@ -551,7 +552,7 @@ export default function SearchModal({
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    { icon: FolderKanban, label: 'All Projects', tab: 'projects', desc: 'Browse all active projects' },
+                    { icon: FolderKanban, label: 'All Projects', tab: 'dashboard', desc: 'Browse all active projects' },
                     { icon: FileText, label: 'Deliverables', tab: 'deliverables', desc: 'View files and assets' },
                     { icon: FileSignature, label: 'Agreements', tab: 'agreements', desc: 'MSAs, NDAs, SOWs' },
                     { icon: Bell, label: 'Activity Log', tab: 'dashboard', desc: 'Recent team activity' },

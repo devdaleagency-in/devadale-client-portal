@@ -4,7 +4,7 @@ import User from '../models/User';
 
 interface AuthSocket extends Socket {
   userId?: string;
-  userRole?: 'admin' | 'client' | 'onboarding';
+  userRole?: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
   userName?: string;
 }
 

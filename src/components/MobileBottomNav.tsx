@@ -9,7 +9,6 @@ interface MobileBottomNavProps {
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'projects', label: 'Projects', icon: Briefcase },
   { id: 'notifications', label: 'Alerts', icon: Bell, modal: true },
   { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'profile', label: 'Profile', icon: User },

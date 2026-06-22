@@ -7,7 +7,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'client';
+  role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
   avatarUrl: string;
   title: string;
 }
@@ -107,11 +107,56 @@ export interface Invoice {
   id: string;
   number: string;
   client: string;
+  clientId?: string;
   amount: number;
+  tax?: number;
+  total?: number;
   currency: string;
-  status: 'paid' | 'pending' | 'overdue';
+  status: string;
   dueDate: string;
   issuedDate: string;
+  notes?: string;
+  lineItems?: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+  }>;
+  createdAt?: string;
+}
+
+export function toClientStatus(status: string): string {
+  const map: Record<string, string> = {
+    draft: 'Preparing',
+    sent: 'Received',
+    viewed: 'Under Review',
+    paid: 'Paid',
+    partially_paid: 'Partially Paid',
+    overdue: 'Overdue',
+    cancelled: 'Cancelled',
+  };
+  return map[status] || status;
+}
+
+export function getStatusColor(status: string, clientView = true): string {
+  const s = clientView ? toClientStatus(status) : status;
+  const colors: Record<string, string> = {
+    Preparing: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    Received: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    'Under Review': 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+    Paid: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+    'Partially Paid': 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    Overdue: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+    Cancelled: 'bg-slate-100 dark:bg-slate-800 text-slate-400',
+    draft: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
+    sent: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    viewed: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
+    paid: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
+    partially_paid: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    overdue: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400',
+    cancelled: 'bg-slate-100 dark:bg-slate-800 text-slate-400',
+  };
+  return colors[s] || 'bg-slate-100 dark:bg-slate-800 text-slate-500';
 }
 
 export interface UploadedFile {

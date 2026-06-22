@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { X, LayoutDashboard, Briefcase, Calendar, MessageSquare, ScrollText, FileCheck, Settings, Palette, User, Plus, Receipt, Bell, LifeBuoy, Users, ClipboardList, Database, UserPlus, BarChart3, CreditCard, Puzzle } from 'lucide-react';
+import { X, LayoutDashboard, Briefcase, Calendar, MessageSquare, ScrollText, FileCheck, Receipt, Bell, User, LifeBuoy, Plus } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import RippleButton from './RippleButton';
 
@@ -8,40 +8,19 @@ interface MobileSidebarProps {
   onClose: () => void;
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  currentRole: 'admin' | 'client' | 'onboarding';
+  currentRole: 'admin' | 'client' | 'team_member' | 'onboarding';
   onNewProjectClick: () => void;
 }
 
 const mainTabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'profile', label: 'My Profile', icon: User },
-  { id: 'projects', label: 'Projects', icon: Briefcase },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  { id: 'timeline', label: 'Roadmap', icon: Calendar },
   { id: 'deliverables', label: 'Deliverables', icon: FileCheck },
-];
-
-const operationsTabs = [
-  { id: 'clients', label: 'Clients', icon: UserPlus },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'billing', label: 'Billing', icon: CreditCard },
-];
-
-const workspaceTabs = [
+  { id: 'messages', label: 'Messages', icon: MessageSquare },
+  { id: 'agreements', label: 'Agreements', icon: ScrollText },
   { id: 'invoices', label: 'Invoices', icon: Receipt },
-  { id: 'notifications', label: 'Notifications', icon: Bell, badge: 3 },
-  { id: 'support', label: 'Support Center', icon: LifeBuoy },
-];
-
-const collaborationTabs = [
-  { id: 'team', label: 'Team Access', icon: Users },
-  { id: 'meetings', label: 'Meeting Notes', icon: ClipboardList },
-];
-
-const adminTabs = [
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'branding', label: 'Portal Config', icon: Palette },
-  { id: 'system', label: 'System', icon: Database },
-  { id: 'integrations', label: 'Integrations', icon: Puzzle },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'profile', label: 'My Profile', icon: User },
 ];
 
 export default function MobileSidebar({
@@ -67,7 +46,7 @@ export default function MobileSidebar({
     };
   }, [isOpen, onClose]);
 
-  const renderTab = (tab: { id: string; label: string; icon: any; badge?: number }) => {
+  const renderTab = (tab: { id: string; label: string; icon: any }) => {
     const IconComponent = tab.icon;
     const isActive = currentTab === tab.id;
 
@@ -83,11 +62,6 @@ export default function MobileSidebar({
       >
         <IconComponent className={`w-5 h-5 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
         <span className="flex-1">{tab.label}</span>
-        {tab.badge ? (
-          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-rose-500 text-white min-w-[20px] text-center leading-tight">
-            {tab.badge}
-          </span>
-        ) : null}
       </RippleButton>
     );
   };
@@ -131,56 +105,7 @@ export default function MobileSidebar({
         </div>
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 px-3 pb-4">
-          {/* Main Section */}
           {mainTabs.map(renderTab)}
-
-          {/* Operations - only for non-client */}
-          {currentRole !== 'client' && (
-            <>
-              <div className="pt-3 pb-1">
-                <div className="flex items-center gap-2 px-3">
-                  <div className="flex-1 h-px bg-slate-800/60" />
-                  <span className="text-[10px] font-bold tracking-widest text-slate-600 uppercase">Operations</span>
-                  <div className="flex-1 h-px bg-slate-800/60" />
-                </div>
-              </div>
-              {operationsTabs.map(renderTab)}
-            </>
-          )}
-
-          {/* Divider - Workspace */}
-          <div className="pt-3 pb-1">
-            <div className="flex items-center gap-2 px-3">
-              <div className="flex-1 h-px bg-slate-800/60" />
-              <span className="text-[10px] font-bold tracking-widest text-slate-600 uppercase">Workspace</span>
-              <div className="flex-1 h-px bg-slate-800/60" />
-            </div>
-          </div>
-          {workspaceTabs.map(renderTab)}
-
-          {/* Divider - Collaboration */}
-          <div className="pt-3 pb-1">
-            <div className="flex items-center gap-2 px-3">
-              <div className="flex-1 h-px bg-slate-800/60" />
-              <span className="text-[10px] font-bold tracking-widest text-slate-600 uppercase">Collaboration</span>
-              <div className="flex-1 h-px bg-slate-800/60" />
-            </div>
-          </div>
-          {collaborationTabs.map(renderTab)}
-
-          {/* Management - only for non-client */}
-          {currentRole !== 'client' && (
-            <>
-              <div className="pt-3 pb-1">
-                <div className="flex items-center gap-2 px-3">
-                  <div className="flex-1 h-px bg-slate-800/60" />
-                  <span className="text-[10px] font-bold tracking-widest text-slate-600 uppercase">Management</span>
-                  <div className="flex-1 h-px bg-slate-800/60" />
-                </div>
-              </div>
-              {adminTabs.map(renderTab)}
-            </>
-          )}
         </nav>
 
         <div className="border-t border-slate-800/50 px-3 py-4 space-y-3">
@@ -192,6 +117,14 @@ export default function MobileSidebar({
             <Plus className="w-4 h-4" />
             <span>New Project</span>
           </button>
+
+          <RippleButton
+            onClick={() => handleTabClick('support')}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl font-semibold transition-all text-sm"
+          >
+            <LifeBuoy className="w-4 h-4" />
+            <span>Support Center</span>
+          </RippleButton>
 
           <div className="bg-slate-800/30 rounded-lg p-3">
             <div className="text-[10px] font-bold tracking-widest text-slate-500 mb-1 uppercase">Perspective</div>

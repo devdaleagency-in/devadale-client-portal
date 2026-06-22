@@ -1,5 +1,18 @@
 import type { Project, Agreement, ActivityFeed, Deadline, Invoice, UploadedFile, ApprovalItem, TeamActivity } from '../types';
 
+function toClientStatus(status: string): string {
+  const map: Record<string, string> = {
+    draft: 'Preparing',
+    sent: 'Received',
+    viewed: 'Under Review',
+    paid: 'Paid',
+    partially_paid: 'Partially Paid',
+    overdue: 'Overdue',
+    cancelled: 'Cancelled',
+  };
+  return map[status] || status;
+}
+
 export interface SearchResultItem {
   id: string;
   category: string;
@@ -106,7 +119,7 @@ export function searchAll(
   }
 
   for (const p of projects) {
-    addIfMatch('Projects', p.id, p.name, `${p.client} · ${p.stage} · ${p.progress}% complete`, 'FolderKanban', 'projects', {
+    addIfMatch('Projects', p.id, p.name, `${p.client} · ${p.stage} · ${p.progress}% complete`, 'FolderKanban', 'dashboard', {
       timestamp: p.lastUpdated,
       status: p.health,
       owner: p.client,
@@ -131,12 +144,13 @@ export function searchAll(
 
   for (const inv of invoices) {
     const amount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(inv.amount);
+    const clientStatus = toClientStatus(inv.status);
     addIfMatch('Invoices', inv.id, `${inv.number} · ${amount}`, `${inv.client} · Due ${inv.dueDate}`, 'DollarSign', 'agreements', {
       timestamp: inv.issuedDate,
-      status: inv.status,
+      status: clientStatus,
       owner: inv.client,
       projectName: inv.client,
-    }, [inv.number, inv.client, inv.status, inv.dueDate]);
+    }, [inv.number, inv.client, clientStatus, inv.dueDate]);
   }
 
   for (const a of agreements) {
@@ -149,7 +163,7 @@ export function searchAll(
   }
 
   for (const dl of deadlines) {
-    addIfMatch('Tasks', dl.id, dl.task, `${dl.project} · ${dl.assignee}`, 'CalendarCheck', 'projects', {
+    addIfMatch('Tasks', dl.id, dl.task, `${dl.project} · ${dl.assignee}`, 'CalendarCheck', 'dashboard', {
       timestamp: dl.dueDate,
       status: dl.status,
       owner: dl.assignee,

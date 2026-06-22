@@ -7,8 +7,9 @@ import {
   Search,
   BellOff,
   ArrowLeft,
-  SlidersHorizontal,
+  Filter,
   CalendarDays,
+  Inbox,
 } from 'lucide-react';
 import type { AppNotification, NotificationCategory } from '../../types';
 import NotificationItem from './NotificationItem';
@@ -26,16 +27,25 @@ interface NotificationCenterProps {
   onAction?: (id: string, action: string) => void;
 }
 
-const categoryTabs: { key: NotificationCategory | 'all'; label: string }[] = [
+type FilterKey = 'all' | 'unread' | 'project_updates' | 'messages' | 'deliverables' | 'invoices';
+
+const filterTabs: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'approval', label: 'Approvals' },
-  { key: 'message', label: 'Messages' },
-  { key: 'upload', label: 'Uploads' },
-  { key: 'billing', label: 'Billing' },
-  { key: 'task', label: 'Tasks' },
-  { key: 'system', label: 'System' },
-  { key: 'activity', label: 'Activity' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'project_updates', label: 'Project Updates' },
+  { key: 'messages', label: 'Messages' },
+  { key: 'deliverables', label: 'Deliverables' },
+  { key: 'invoices', label: 'Invoices' },
 ];
+
+const filterCategoryMap: Record<FilterKey, NotificationCategory[] | null> = {
+  all: null,
+  unread: null,
+  project_updates: ['task', 'approval', 'activity'],
+  messages: ['message'],
+  deliverables: ['upload'],
+  invoices: ['billing'],
+};
 
 const ITEMS_PER_PAGE = 10;
 
@@ -51,17 +61,16 @@ export default function NotificationCenter({
   onDownload,
   onAction,
 }: NotificationCenterProps) {
-  const [activeTab, setActiveTab] = useState<NotificationCategory | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setPage(1);
       setSearchQuery('');
-      setActiveTab('all');
+      setActiveFilter('all');
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
@@ -69,8 +78,13 @@ export default function NotificationCenter({
   const filtered = useMemo(() => {
     let result = notifications;
 
-    if (activeTab !== 'all') {
-      result = result.filter((n) => n.category === activeTab);
+    if (activeFilter === 'unread') {
+      result = result.filter((n) => !n.read);
+    } else {
+      const categories = filterCategoryMap[activeFilter];
+      if (categories) {
+        result = result.filter((n) => categories.includes(n.category));
+      }
     }
 
     if (searchQuery.trim()) {
@@ -85,7 +99,7 @@ export default function NotificationCenter({
     }
 
     return result;
-  }, [notifications, activeTab, searchQuery]);
+  }, [notifications, activeFilter, searchQuery]);
 
   const paginated = useMemo(
     () => filtered.slice(0, page * ITEMS_PER_PAGE),
@@ -109,6 +123,8 @@ export default function NotificationCenter({
     }
     return groups;
   }, [paginated, viewMode]);
+
+  const showEmptyCTA = paginated.length === 0;
 
   if (!isOpen) return null;
 
@@ -142,17 +158,6 @@ export default function NotificationCenter({
             Notification History
           </h2>
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-1.5 rounded-lg transition-all ${
-              showFilters
-                ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-600'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-            aria-label="Toggle filters"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </button>
-          <button
             onClick={onMarkAllRead}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg transition-all"
             aria-label="Mark all as read"
@@ -169,7 +174,7 @@ export default function NotificationCenter({
           </button>
         </div>
 
-        {/* Search + Category Tabs */}
+        {/* Search + Filter Tabs */}
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800/50 space-y-2.5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
@@ -184,12 +189,12 @@ export default function NotificationCenter({
             />
           </div>
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-            {categoryTabs.map((tab) => (
+            {filterTabs.map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => { setActiveTab(tab.key); setPage(1); }}
+                onClick={() => { setActiveFilter(tab.key); setPage(1); }}
                 className={`px-2.5 py-1 text-[10px] font-bold rounded-lg whitespace-nowrap transition-all shrink-0 ${
-                  activeTab === tab.key
+                  activeFilter === tab.key
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
@@ -202,18 +207,20 @@ export default function NotificationCenter({
 
         {/* List */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          {paginated.length === 0 ? (
+          {showEmptyCTA ? (
             <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                <BellOff className="w-6 h-6 text-slate-300 dark:text-slate-600" />
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                <Inbox className="w-7 h-7 text-slate-300 dark:text-slate-600" />
               </div>
               <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-                {searchQuery ? 'No matching notifications' : 'No notifications yet'}
+                {activeFilter === 'unread' ? 'All caught up!' : searchQuery ? 'No matching notifications' : 'No notifications yet'}
               </p>
               <p className="text-[11px] text-slate-400 mt-1 text-center max-w-xs">
-                {searchQuery
-                  ? 'Try adjusting your search or filter.'
-                  : 'Notifications from project updates, approvals, and team activity will appear here.'}
+                {activeFilter === 'unread'
+                  ? 'You\'ve read everything. New notifications will appear here.'
+                  : searchQuery
+                    ? 'Try adjusting your search or filter.'
+                    : 'Notifications from project updates, approvals, and team activity will appear here.'}
               </p>
             </div>
           ) : viewMode === 'grouped' && groupedByDate ? (

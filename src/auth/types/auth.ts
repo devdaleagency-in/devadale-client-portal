@@ -2,7 +2,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  role: 'admin' | 'client' | 'onboarding';
+  role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
   avatarUrl: string;
   title: string;
   isEmailVerified: boolean;

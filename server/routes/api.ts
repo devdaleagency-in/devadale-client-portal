@@ -9,18 +9,12 @@ import Session from '../models/Session';
 import Summary from '../models/Summary';
 import Message from '../models/Message';
 import { authenticate } from '../middleware/authenticate';
-import { authorize, adminOnly } from '../middleware/authorize';
-import {
-  getProjects, addProject,
-  getAgreements, addAgreement, signAgreement,
-  getActivity, getMetrics, getMsaStatus,
-  getMessages, addMessage,
-  getUploadedFiles, addUploadedFile,
-  createOnboardingLink, getOnboardingLinkByToken, consumeOnboardingLink,
-  updateUserAvatar, removeUserAvatar,
-  resetDb,
-} from '../db';
+import { authorize, adminOnly, adminOrTeamMember } from '../middleware/authorize';
+import Document from '../models/Document';
+import AuditLog from '../models/AuditLog';
+import OnboardingLink from '../models/OnboardingLink';
 import { generateChatResponse, generateProjectSummary } from '../services/ai';
+import { sendNotification } from '../services/notification.service';
 
 const router = Router();
 
@@ -44,95 +38,214 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/projects', async (_req: Request, res: Response) => {
+router.get('/projects', async (req: Request, res: Response) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
+    const { userId, role } = req.user!;
+    let query: any = {};
+    if (role === 'client') {
+      query = { clientId: userId };
+    } else if (role === 'team_member') {
+      query = { assignedMembers: userId };
+    }
+    
+    const projects = await Project.find(query).sort({ createdAt: -1 });
     res.json(projects);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch projects" });
   }
 });
 
-router.post('/projects', async (req: Request, res: Response) => {
+router.post('/projects', adminOrTeamMember, async (req: Request, res: Response) => {
   try {
     const project = new Project({
+      _id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       ...req.body,
       lastUpdated: "Just now",
     });
     await project.save();
+
+    if (project.clientId) {
+      const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
+      for (const admin of admins) {
+        await sendNotification({
+          userId: admin._id.toString(),
+          type: 'in_app',
+          title: 'New Project Created',
+          body: `Project "${project.name}" has been created.`,
+          data: { category: 'task', metadata: { project: project.name, projectId: project._id } },
+        });
+      }
+      await sendNotification({
+        userId: project.clientId,
+        type: 'in_app',
+        title: 'New Project Created',
+        body: `Your project "${project.name}" has been created. Check your dashboard for details.`,
+        data: { category: 'task', metadata: { project: project.name, projectId: project._id } },
+      });
+    }
+
     res.json(project);
   } catch (error) {
     res.status(500).json({ error: "Failed to create project" });
   }
 });
 
-router.get('/agreements', (_req: Request, res: Response) => {
-  res.json(getAgreements());
-});
-
-router.post('/agreements', (req: Request, res: Response) => {
-  const agreement = addAgreement({
-    ...req.body,
-    id: `agree-${Date.now()}`,
-    date: 'Just now',
-  });
-  res.json(agreement);
-});
-
-router.post('/agreements/sign', (_req: Request, res: Response) => {
-  const result = signAgreement();
-  res.json(result);
-});
-
-router.get('/activity', (_req: Request, res: Response) => {
-  res.json(getActivity());
-});
-
-router.get('/metrics', (_req: Request, res: Response) => {
-  res.json(getMetrics());
-});
-
-router.get('/msa-status', (_req: Request, res: Response) => {
-  res.json({ msaStatus: getMsaStatus() });
-});
-
-router.get('/messages', (_req: Request, res: Response) => {
-  res.json(getMessages());
-});
-
-router.post('/messages', (req: Request, res: Response) => {
-  const { sender, text } = req.body;
-  const msg = addMessage({ sender, text });
-  res.json(msg);
-});
-
-router.post('/chat', async (req: Request, res: Response) => {
-  const { message, projectName } = req.body;
-  const history = getMessages().slice(-10).map((m: any) => ({
-    role: m.sender === 'agent' ? 'model' as const : 'user' as const,
-    text: m.text,
-  }));
+router.get('/agreements', async (req: Request, res: Response) => {
   try {
-    const reply = await generateChatResponse(message, projectName || 'DevDale Agency', history);
-    const agentMsg = addMessage({ sender: 'agent', text: reply });
-    res.json({ reply, message: agentMsg });
-  } catch (err: any) {
-    // Fallback
-    const reply = "I've noted your message and will follow up shortly.";
-    addMessage({ sender: 'agent', text: reply });
-    res.json({ reply });
+    const { role, userId } = req.user!;
+    let query: any = { type: { $in: ['agreement', 'msa', 'sow', 'nda'] } };
+    if (role === 'client') query.clientId = userId;
+    const docs = await Document.find(query).populate('clientId', 'name').sort({ createdAt: -1 });
+    const agreements = docs.map(d => ({
+      id: d._id,
+      name: d.name,
+      client: (d.clientId as any)?.name || 'Unknown',
+      status: d.status === 'final' ? 'signed' : (d.status === 'draft' ? 'pending' : 'draft'),
+      date: d.createdAt.toLocaleDateString(),
+    }));
+    res.json(agreements);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agreements' });
   }
 });
 
-router.post('/chat/message', (req: Request, res: Response) => {
-  const { text } = req.body;
-  const msg = addMessage({ sender: 'user', text });
+router.post('/agreements', adminOrTeamMember, async (req: Request, res: Response) => {
+  try {
+    const { name, client, status } = req.body;
+    // Find client by name (naive approach since frontend sends string)
+    const clientUser = await User.findOne({ name: client, role: 'client' });
+    const doc = new Document({
+      _id: `agree-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      clientId: clientUser ? clientUser._id : req.user!.userId,
+      name: name || 'New Agreement',
+      type: 'msa',
+      fileUrl: '',
+      uploadedBy: req.user!.userId,
+      status: status === 'signed' ? 'final' : (status === 'pending' ? 'draft' : 'draft')
+    });
+    await doc.save();
+    res.json({
+      id: doc._id,
+      name: doc.name,
+      client: client || 'Unknown',
+      status: doc.status === 'final' ? 'signed' : 'pending',
+      date: doc.createdAt.toLocaleDateString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add agreement' });
+  }
+});
+
+router.post('/agreements/sign', async (req: Request, res: Response) => {
+  await Document.updateMany({ clientId: req.user!.userId, type: 'msa' }, { status: 'final' });
+  const metrics = { activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 };
+  const result = { msaStatus: 'signed', agreements: [], metrics, activity: [] };
+  const { userId } = req.user!;
+  const user = await User.findById(userId);
+  if (user) {
+    const admins = await User.find({ role: 'admin', isActive: true }).select('_id');
+    for (const admin of admins) {
+      await sendNotification({
+        userId: admin._id.toString(),
+        type: 'in_app',
+        title: 'Agreement Signed',
+        body: `${user.name} has signed the MSA agreement.`,
+        data: { category: 'approval', actionable: true },
+      });
+    }
+  }
+  res.json(result);
+});
+
+router.get('/activity', async (req: Request, res: Response) => {
+  try {
+    const { role, userId } = req.user!;
+    let query: any = {};
+    if (role === 'client') query.userId = userId;
+    const logs = await AuditLog.find(query).sort({ createdAt: -1 }).limit(20);
+    const activity = logs.map(l => ({
+      id: l._id,
+      message: l.description,
+      timestamp: l.createdAt.toLocaleDateString(),
+      actor: l.userRole,
+      type: l.action
+    }));
+    res.json(activity);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch activity' });
+  }
+});
+
+router.get('/metrics', async (req: Request, res: Response) => {
+  try {
+    const { role } = req.user!;
+    if (role === 'client' || role === 'team_member') return res.json({ activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 });
+    const activeProjects = await Project.countDocuments();
+    const pendingApprovals = await Document.countDocuments({ status: 'draft', type: 'msa' });
+    res.json({ activeProjects, pendingApprovals, teamProductivity: 92, monthlyRevenue: 142 });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch metrics' });
+  }
+});
+
+router.get('/msa-status', async (req: Request, res: Response) => {
+  const { role } = req.user!;
+  if (role === 'client') return res.json({ msaStatus: 'pending' });
+  const msa = await Document.findOne({ type: 'msa', clientId: req.user!.userId }).sort({ createdAt: -1 });
+  res.json({ msaStatus: msa && msa.status === 'final' ? 'signed' : 'pending' });
+});
+
+router.get('/messages', async (req: Request, res: Response) => {
+  try {
+    const { role, userId } = req.user!;
+    let query: any = {};
+    if (role === 'client') query.senderId = userId;
+    const messages = await Message.find(query).sort({ createdAt: 1 });
+    const mapped = messages.map(m => ({
+      id: m._id,
+      sender: m.senderId === 'system' ? 'agent' : 'user',
+      text: m.content,
+      timestamp: m.createdAt.toLocaleDateString()
+    }));
+    res.json(mapped);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+router.post('/messages', async (req: Request, res: Response) => {
+  const { sender, text } = req.body;
+  const msgDoc = new Message({
+    conversationId: 'default',
+    projectId: 'default',
+    senderId: req.user!.userId,
+    senderRole: req.user!.role,
+    content: text
+  });
+  await msgDoc.save();
+  const msg = { id: msgDoc._id, sender: 'user', text, timestamp: (msgDoc as any).createdAt.toISOString() };
+  const { userId } = req.user!;
+  const user = await User.findById(userId);
+  if (user) {
+    const clients = await User.find({ role: 'client', isActive: true }).select('_id');
+    for (const client of clients) {
+      if (client._id.toString() !== userId) {
+        await sendNotification({
+          userId: client._id.toString(),
+          type: 'in_app',
+          title: 'New Message',
+          body: `${user.name}: "${text.slice(0, 100)}${text.length > 100 ? '...' : ''}"`,
+          data: { category: 'message', metadata: { sender: user.name } },
+        });
+      }
+    }
+  }
   res.json(msg);
 });
 
-router.post('/summarize', adminOnly, async (_req: Request, res: Response) => {
+router.post('/summarize', adminOrTeamMember, async (_req: Request, res: Response) => {
   try {
-    const projects = getProjects();
+    const projects = await Project.find({});
     const summary = await generateProjectSummary(JSON.stringify(projects, null, 2));
     res.json({ summary });
   } catch {
@@ -140,50 +253,104 @@ router.post('/summarize', adminOnly, async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/files/upload', upload.array('files', 10), (req: Request, res: Response) => {
+router.post('/files/upload', upload.array('files', 10), async (req: Request, res: Response) => {
   const files = req.files as Express.Multer.File[];
-  const uploaded = files.map((f) =>
-    addUploadedFile({
+  const uploaded = await Promise.all(files.map(async (f) => {
+    const doc = new Document({
+      _id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      clientId: req.user!.userId,
+      name: f.originalname,
+      type: 'file',
+      mimeType: f.mimetype,
+      fileUrl: `/uploads/${f.filename}`,
+      fileSize: f.size,
+      uploadedBy: req.user!.userId,
+    });
+    await doc.save();
+    return {
+      id: doc._id,
       name: f.originalname,
       size: `${(f.size / (1024 * 1024)).toFixed(2)} MB`,
       tag: (req.body.tag as string) || 'uploaded',
-      path: `/uploads/${f.filename}`,
-    })
-  );
+      path: doc.fileUrl,
+      uploadedAt: doc.createdAt.toISOString()
+    };
+  }));
+  const { userId } = req.user!;
+  const user = await User.findById(userId);
+  if (user) {
+    const clients = await User.find({ role: 'client', isActive: true }).select('_id');
+    for (const client of clients) {
+      if (client._id.toString() !== userId) {
+        await sendNotification({
+          userId: client._id.toString(),
+          type: 'in_app',
+          title: 'File Uploaded',
+          body: `${user.name} uploaded ${files.length} file(s): ${files.map(f => f.originalname).join(', ').slice(0, 120)}`,
+          data: { category: 'upload', metadata: { uploader: user.name } },
+        });
+      }
+    }
+  }
   res.json(uploaded);
 });
 
-router.get('/files', (_req: Request, res: Response) => {
-  res.json(getUploadedFiles());
+router.get('/files', async (req: Request, res: Response) => {
+  try {
+    const { role, userId } = req.user!;
+    let query: any = { type: 'file' };
+    if (role === 'client') query.clientId = userId;
+    const docs = await Document.find(query).sort({ createdAt: -1 });
+    const files = docs.map(d => ({
+      id: d._id,
+      name: d.name,
+      size: `${(d.fileSize / (1024 * 1024)).toFixed(2)} MB`,
+      tag: 'uploaded',
+      path: d.fileUrl,
+      uploadedAt: d.createdAt.toISOString()
+    }));
+    res.json(files);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch files' });
+  }
 });
 
-router.post('/users/me/avatar', upload.single('avatar'), (req: Request, res: Response) => {
+router.post('/users/me/avatar', upload.single('avatar'), async (req: Request, res: Response) => {
   const { userId } = req.user!;
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const avatarPath = `/uploads/${req.file.filename}`;
-  const user = updateUserAvatar(userId, avatarPath);
+  const user = await User.findByIdAndUpdate(userId, { avatarUrl: avatarPath }, { new: true });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ user });
+  res.json({ user: user.toJSON() });
 });
 
-router.delete('/users/me/avatar', (req: Request, res: Response) => {
+router.delete('/users/me/avatar', async (req: Request, res: Response) => {
   const { userId } = req.user!;
-  const user = removeUserAvatar(userId);
+  const user = await User.findByIdAndUpdate(userId, { avatarUrl: '' }, { new: true });
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ user });
+  res.json({ user: user.toJSON() });
 });
 
-router.post('/reset', adminOnly, (_req: Request, res: Response) => {
-  const db = resetDb();
-  res.json({ message: 'Database reset to initial state', db });
+router.post('/reset', adminOnly, async (_req: Request, res: Response) => {
+  await Project.deleteMany({});
+  await Document.deleteMany({});
+  await AuditLog.deleteMany({});
+  await Message.deleteMany({});
+  await OnboardingLink.deleteMany({});
+  res.json({ message: 'Database reset to initial state', db: { projects: [], agreements: [], activity: [], metrics: { activeProjects: 0, pendingApprovals: 0, teamProductivity: 0, monthlyRevenue: 0 } } });
 });
 
-router.post('/admin/onboarding-link', adminOnly, (req: Request, res: Response) => {
+router.post('/admin/onboarding-link', adminOnly, async (req: Request, res: Response) => {
   const { clientName, organization, phone, email, expiresAt } = req.body;
   if (!clientName || !organization || !phone || !email || !expiresAt) {
     return res.status(400).json({ error: 'All fields are required: clientName, organization, phone, email, expiresAt' });
   }
-  const link = createOnboardingLink({ clientName, organization, phone, email, expiresAt });
+  const link = new OnboardingLink({
+    _id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    token: `onb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    clientName, organization, phone, email, expiresAt
+  });
+  await link.save();
   res.json(link);
 });
 
@@ -244,17 +411,16 @@ router.patch('/settings/white-label', adminOnly, async (req: Request, res: Respo
   }
 });
 
-router.post('/summaries/generate', adminOnly, async (req: Request, res: Response) => {
+router.post('/summaries/generate', adminOrTeamMember, async (req: Request, res: Response) => {
   try {
     const projects: any[] = await Project.find().sort({ createdAt: -1 });
     const totalProgress = projects.length > 0
       ? Math.round(projects.reduce((a, p) => a + (p.progress || 0), 0) / projects.length)
       : 0;
     const milestonesCompleted = projects.filter((p) => p.progress >= 100).length;
-    const { getMessages, getActivity, getUploadedFiles } = await import('../db');
-    const dbMessages = getMessages();
-    const activity = getActivity();
-    const uploadedFiles = getUploadedFiles();
+    const dbMessages = await Message.find().sort({ createdAt: -1 }).limit(50);
+  const activity = await AuditLog.find().sort({ createdAt: -1 }).limit(50);
+  const uploadedFiles = await Document.find({ type: 'file' }).sort({ createdAt: -1 });
 
     let mongoMessageCount = 0;
     try {
@@ -443,7 +609,7 @@ function generateClientSummary(data: {
   return lines.join('\n');
 }
 
-router.get('/summaries', async (_req: Request, res: Response) => {
+router.get('/summaries', adminOrTeamMember, async (_req: Request, res: Response) => {
   try {
     const summaries = await Summary.find().sort({ generatedAt: -1 }).limit(20);
     res.json(summaries);
@@ -452,7 +618,7 @@ router.get('/summaries', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/summaries/:id', async (req: Request, res: Response) => {
+router.get('/summaries/:id', adminOrTeamMember, async (req: Request, res: Response) => {
   try {
     const summary = await Summary.findById(req.params.id);
     if (!summary) return res.status(404).json({ error: 'Summary not found' });
@@ -462,7 +628,7 @@ router.get('/summaries/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/summaries/:id/export-pdf', async (req: Request, res: Response) => {
+router.post('/summaries/:id/export-pdf', adminOrTeamMember, async (req: Request, res: Response) => {
   try {
     const summary = await Summary.findById(req.params.id);
     if (!summary) return res.status(404).json({ error: 'Summary not found' });
@@ -560,7 +726,7 @@ ${summary.blockers && summary.blockers.length > 0 ? `
   }
 });
 
-router.post('/summaries/:id/send-email', async (req: Request, res: Response) => {
+router.post('/summaries/:id/send-email', adminOrTeamMember, async (req: Request, res: Response) => {
   try {
     const summary = await Summary.findById(req.params.id);
     if (!summary) return res.status(404).json({ error: 'Summary not found' });

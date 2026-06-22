@@ -7,7 +7,7 @@ export interface IUser {
   username: string;
   email: string;
   password: string;
-  role: 'admin' | 'client' | 'onboarding';
+  role: 'super_admin' | 'admin' | 'client' | 'team_member' | 'onboarding';
   avatarUrl: string;
   title: string;
   isEmailVerified: boolean;
@@ -20,6 +20,7 @@ export interface IUser {
   isActive: boolean;
   loginAttempts: number;
   lockUntil: Date | null;
+  assignedProjects: string[];
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -30,7 +31,7 @@ const userSchema = new Schema<IUser>(
     username: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     password: { type: String, required: true, minlength: 8, select: false },
-    role: { type: String, enum: ['admin', 'client', 'onboarding'], default: 'client' },
+    role: { type: String, enum: ['super_admin', 'admin', 'client', 'team_member', 'onboarding'], default: 'client' },
     avatarUrl: { type: String, default: '' },
     title: { type: String, default: '' },
     isEmailVerified: { type: Boolean, default: false },
@@ -43,6 +44,7 @@ const userSchema = new Schema<IUser>(
     isActive: { type: Boolean, default: true },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
+    assignedProjects: [{ type: String, ref: 'Project' }],
   },
   { timestamps: true, _id: false }
 );
@@ -62,7 +64,7 @@ userSchema.methods.isLocked = function (): boolean {
 };
 
 userSchema.set('toJSON', {
-  transform(_doc, ret) {
+  transform(_doc, ret: any) {
     delete ret.password;
     delete ret.emailVerificationToken;
     delete ret.emailVerificationExpires;

@@ -1,4 +1,4 @@
-import { DollarSign, Download, CreditCard, AlertTriangle, CheckCircle2, Clock, Receipt } from 'lucide-react';
+import { DollarSign, Download, CreditCard, AlertTriangle, CheckCircle2, Clock, Receipt, Eye, PiggyBank } from 'lucide-react';
 import { Invoice } from '../../types';
 
 interface InvoiceStatusProps {
@@ -8,10 +8,27 @@ interface InvoiceStatusProps {
   onDownload?: (invoice: Invoice) => void;
 }
 
-const statusConfig = {
-  paid: { icon: CheckCircle2, bg: 'bg-emerald-50 dark:bg-emerald-950/20', text: 'text-emerald-600 dark:text-emerald-400', label: 'Paid' },
-  pending: { icon: Clock, bg: 'bg-amber-50 dark:bg-amber-950/20', text: 'text-amber-600 dark:text-amber-400', label: 'Pending' },
-  overdue: { icon: AlertTriangle, bg: 'bg-rose-50 dark:bg-rose-950/20', text: 'text-rose-600 dark:text-rose-400', label: 'Overdue' },
+function toClientStatus(status: string): string {
+  const map: Record<string, string> = {
+    draft: 'Preparing',
+    sent: 'Received',
+    viewed: 'Under Review',
+    paid: 'Paid',
+    partially_paid: 'Partially Paid',
+    overdue: 'Overdue',
+    cancelled: 'Cancelled',
+  };
+  return map[status] || status;
+}
+
+const statusConfig: Record<string, { icon: any; bg: string; text: string; label: string }> = {
+  Preparing: { icon: Clock, bg: 'bg-blue-50 dark:bg-blue-950/20', text: 'text-blue-600 dark:text-blue-400', label: 'Preparing' },
+  Received: { icon: Eye, bg: 'bg-blue-50 dark:bg-blue-950/20', text: 'text-blue-600 dark:text-blue-400', label: 'Received' },
+  'Under Review': { icon: Eye, bg: 'bg-purple-50 dark:bg-purple-950/20', text: 'text-purple-600 dark:text-purple-400', label: 'Under Review' },
+  Paid: { icon: CheckCircle2, bg: 'bg-emerald-50 dark:bg-emerald-950/20', text: 'text-emerald-600 dark:text-emerald-400', label: 'Paid' },
+  'Partially Paid': { icon: PiggyBank, bg: 'bg-orange-50 dark:bg-orange-950/20', text: 'text-orange-600 dark:text-orange-400', label: 'Partially Paid' },
+  Overdue: { icon: AlertTriangle, bg: 'bg-rose-50 dark:bg-rose-950/20', text: 'text-rose-600 dark:text-rose-400', label: 'Overdue' },
+  Cancelled: { icon: AlertTriangle, bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-400', label: 'Cancelled' },
 };
 
 function SkeletonSummary() {
@@ -47,18 +64,27 @@ function SkeletonRows() {
 }
 
 export default function InvoiceStatus({ invoices, loading, onPay, onDownload }: InvoiceStatusProps) {
-  const totalPaid = invoices.filter((i) => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
-  const totalPending = invoices.filter((i) => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0);
-  const totalOverdue = invoices.filter((i) => i.status === 'overdue').reduce((sum, i) => sum + i.amount, 0);
+  const paidStatuses = ['paid'];
+  const pendingStatuses = ['draft', 'sent', 'viewed', 'partially_paid'];
+  const overdueStatuses = ['overdue'];
+
+  const totalPaid = invoices.filter((i) => paidStatuses.includes(i.status)).reduce((sum, i) => sum + i.amount, 0);
+  const totalPending = invoices.filter((i) => pendingStatuses.includes(i.status)).reduce((sum, i) => sum + i.amount, 0);
+  const totalOverdue = invoices.filter((i) => overdueStatuses.includes(i.status)).reduce((sum, i) => sum + i.amount, 0);
 
   const summaryItems = [
-    { label: 'Paid', amount: totalPaid, count: invoices.filter((i) => i.status === 'paid').length, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20' },
-    { label: 'Pending', amount: totalPending, count: invoices.filter((i) => i.status === 'pending').length, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/20' },
-    { label: 'Overdue', amount: totalOverdue, count: invoices.filter((i) => i.status === 'overdue').length, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-950/20' },
+    { label: 'Paid', amount: totalPaid, count: invoices.filter((i) => paidStatuses.includes(i.status)).length, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20' },
+    { label: 'Pending', amount: totalPending, count: invoices.filter((i) => pendingStatuses.includes(i.status)).length, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/20' },
+    { label: 'Overdue', amount: totalOverdue, count: invoices.filter((i) => overdueStatuses.includes(i.status)).length, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-950/20' },
   ];
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
+  const formatCurrency = (amount: number, currency?: string) => {
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', minimumFractionDigits: 0 }).format(amount || 0);
+    } catch {
+      return `${currency || 'USD'} ${(amount || 0).toLocaleString()}`;
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-5 shadow-sm">
@@ -94,7 +120,7 @@ export default function InvoiceStatus({ invoices, loading, onPay, onDownload }: 
           <div className="grid grid-cols-3 gap-2 mb-4">
             {summaryItems.map((item) => (
               <div key={item.label} className={`${item.bg} rounded-xl p-2.5 text-center`}>
-                <p className={`text-xs font-black ${item.color}`}>{formatCurrency(item.amount)}</p>
+                <p className={`text-xs font-black ${item.color}`}>{formatCurrency(item.amount, invoices[0]?.currency)}</p>
                 <p className="text-[9px] text-slate-400 mt-0.5">{item.label} ({item.count})</p>
               </div>
             ))}
@@ -102,12 +128,13 @@ export default function InvoiceStatus({ invoices, loading, onPay, onDownload }: 
 
           <div className="space-y-1.5">
             {invoices.map((inv) => {
-              const sc = statusConfig[inv.status];
+              const clientStatus = toClientStatus(inv.status);
+              const sc = statusConfig[clientStatus] || statusConfig.Preparing;
               const StatusIcon = sc.icon;
 
               return (
                 <div
-                  key={inv.id}
+                  key={(inv as any)._id || inv.id}
                   className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all"
                 >
                   <div className={`w-8 h-8 rounded-lg ${sc.bg} flex items-center justify-center shrink-0`}>
@@ -120,7 +147,7 @@ export default function InvoiceStatus({ invoices, loading, onPay, onDownload }: 
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] font-bold text-slate-800 dark:text-slate-100">
-                        {formatCurrency(inv.amount)}
+                        {formatCurrency(inv.amount, inv.currency)}
                       </span>
                       <span className="text-[9px] text-slate-300">•</span>
                       <span className="text-[9px] text-slate-400">Due {inv.dueDate}</span>

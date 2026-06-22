@@ -43,6 +43,7 @@ export async function registerUser(data: {
   }
 
   const user = await User.create({
+    _id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: data.name,
     username: data.username.toLowerCase(),
     email: data.email.toLowerCase(),

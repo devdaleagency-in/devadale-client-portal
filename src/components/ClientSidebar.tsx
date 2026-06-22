@@ -5,13 +5,10 @@ import {
   MessageSquare,
   ScrollText,
   FileCheck,
-  Plus,
-  User,
-  Users,
-  LifeBuoy,
   Receipt,
   Bell,
-  ClipboardList,
+  User,
+  LifeBuoy,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import RippleButton from './RippleButton';
@@ -19,31 +16,23 @@ import RippleButton from './RippleButton';
 interface ClientSidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  unreadCount?: number;
 }
 
 export default function ClientSidebar({
   currentTab,
   setCurrentTab,
+  unreadCount = 0,
 }: ClientSidebarProps) {
   const mainTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'projects', label: 'Projects', icon: Briefcase },
-    { id: 'timeline', label: 'Roadmap', icon: Calendar },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'timeline', label: 'Roadmap', icon: Calendar },
+    { id: 'deliverables', label: 'Deliverables', icon: FileCheck },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'agreements', label: 'Agreements', icon: ScrollText },
-    { id: 'deliverables', label: 'Deliverables', icon: FileCheck },
-  ];
-
-  const workspaceTabs = [
     { id: 'invoices', label: 'Invoices', icon: Receipt },
-    { id: 'notifications', label: 'Notifications', icon: Bell, badge: 3 },
-    { id: 'support', label: 'Support Center', icon: LifeBuoy },
-  ];
-
-  const collaborationTabs = [
-    { id: 'team', label: 'Team Access', icon: Users },
-    { id: 'meetings', label: 'Meeting Notes', icon: ClipboardList },
+    { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadCount },
+    { id: 'profile', label: 'My Profile', icon: User },
   ];
 
   const handleTabClick = (tabId: string) => {
@@ -53,6 +42,7 @@ export default function ClientSidebar({
   const renderTab = (tab: { id: string; label: string; icon: any; badge?: number }) => {
     const IconComponent = tab.icon;
     const isActive = currentTab === tab.id;
+    const showBadge = tab.badge !== undefined && tab.badge > 0;
 
     return (
       <RippleButton
@@ -66,27 +56,14 @@ export default function ClientSidebar({
       >
         <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
         <span className="flex-1">{tab.label}</span>
-        {tab.badge ? (
+        {showBadge && (
           <span className="px-1.5 py-0.5 text-[8px] font-bold rounded-full bg-rose-500 text-white min-w-[18px] text-center leading-tight">
             {tab.badge}
           </span>
-        ) : null}
+        )}
       </RippleButton>
     );
   };
-
-  const renderSection = (title: string, tabs: any[]) => (
-    <>
-      <div className="pt-4 pb-1">
-        <div className="flex items-center gap-2 px-3">
-          <div className="flex-1 h-px bg-slate-800/60" />
-          <span className="text-[9px] font-bold tracking-widest text-slate-600 uppercase">{title}</span>
-          <div className="flex-1 h-px bg-slate-800/60" />
-        </div>
-      </div>
-      {tabs.map(renderTab)}
-    </>
-  );
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 h-screen fixed left-0 top-0 z-40 transition-colors">
@@ -96,8 +73,6 @@ export default function ClientSidebar({
 
       <nav className="flex-1 overflow-y-auto space-y-0.5 px-3 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
         {mainTabs.map(renderTab)}
-        {renderSection('Workspace', workspaceTabs)}
-        {renderSection('Collaboration', collaborationTabs)}
       </nav>
 
       <div className="border-t border-slate-800/50 px-3 py-3 space-y-2">
@@ -111,10 +86,11 @@ export default function ClientSidebar({
 
         <RippleButton
           type="button"
-          className="w-full py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10 text-[11px] touch-manipulation"
+          className="w-full flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg font-semibold transition-all text-[11px] touch-manipulation"
+          onClick={() => handleTabClick('support')}
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Project</span>
+          <LifeBuoy className="w-3.5 h-3.5" />
+          <span>Support Center</span>
         </RippleButton>
       </div>
     </aside>

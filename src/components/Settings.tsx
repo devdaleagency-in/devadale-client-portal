@@ -65,13 +65,6 @@ interface IntegrationItem {
   status: IntegrationStatus;
 }
 
-interface Invoice {
-  id: string;
-  client: string;
-  amount: string;
-  status: 'Paid' | 'Pending' | 'Draft';
-}
-
 const settingTabs: SettingsTab[] = ['Client Workspace', 'Security', 'Notifications', 'Integrations', 'Billing'];
 
 const defaultSettings: WorkspaceSettings = {
@@ -96,12 +89,6 @@ const defaultIntegrations: IntegrationItem[] = [
   { title: 'PostgreSQL Database', body: 'Projects, users, approvals, audit trails.', icon: Database, status: 'Connected' },
 ];
 
-const defaultInvoices: Invoice[] = [
-  { id: 'INV-2048', client: 'Aether Fintech', amount: '$12,800', status: 'Paid' },
-  { id: 'INV-2049', client: 'DevDale Agency', amount: '$8,600', status: 'Pending' },
-  { id: 'INV-2050', client: 'SwiftShop E-com', amount: '$15,400', status: 'Draft' },
-];
-
 function readStoredSettings(): WorkspaceSettings {
   try {
     const raw = localStorage.getItem('devdale-settings');
@@ -118,7 +105,6 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
   const [removingAvatar, setRemovingAvatar] = useState(false);
   const [settings, setSettings] = useState<WorkspaceSettings>(readStoredSettings);
   const [integrations, setIntegrations] = useState<IntegrationItem[]>(defaultIntegrations);
-  const [invoices, setInvoices] = useState<Invoice[]>(defaultInvoices);
   const [lastSavedAt, setLastSavedAt] = useState('Not saved this session');
 
   const domainError = settings.portalDomain.trim().length === 0 || settings.portalDomain.includes(' ');
@@ -158,15 +144,6 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
       )
     );
     onTriggerAction(`${title} integration configured successfully.`);
-  };
-
-  const createInvoice = () => {
-    const nextNumber = 2051 + invoices.length - defaultInvoices.length;
-    setInvoices((current) => [
-      { id: `INV-${nextNumber}`, client: 'New Client Workspace', amount: '$9,200', status: 'Draft' },
-      ...current,
-    ]);
-    onTriggerAction('Invoice generated and payment link prepared.');
   };
 
   const handleAvatarFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -513,33 +490,9 @@ export default function Settings({ metrics, projects, onResetData, onTriggerActi
           <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
             <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-blue-600" />
-              Invoices & Payment Setup
+              Payment Setup
             </h3>
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="text-[10px] uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="py-2">Invoice</th>
-                    <th className="py-2">Client</th>
-                    <th className="py-2">Amount</th>
-                    <th className="py-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id}>
-                      <td className="py-3 font-black text-slate-800 dark:text-slate-100">{invoice.id}</td>
-                      <td className="py-3 text-slate-500 dark:text-slate-400">{invoice.client}</td>
-                      <td className="py-3 font-bold text-slate-700 dark:text-slate-200">{invoice.amount}</td>
-                      <td className="py-3">
-                        <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[10px] font-black text-slate-600 dark:text-slate-300">{invoice.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <button onClick={createInvoice} className="mt-5 rounded-xl bg-blue-600 text-white px-4 py-2.5 font-black">Create Invoice</button>
+            <p className="text-[11px] text-slate-400 mt-2">Manage invoices from the <strong>Invoices</strong> tab in the sidebar.</p>
           </div>
 
           <div className="space-y-4">
